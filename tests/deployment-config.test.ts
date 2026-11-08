@@ -9,13 +9,25 @@ describe("Aave EURC Public Vault deployment configuration", () => {
     expect(deploymentConfig.shareTokenSymbol).toBe("ylEurc");
   });
 
-  it("uses the confirmed owner as the fee recipient", () => {
+  it("uses the confirmed owner as the sole fee recipient", () => {
     expect(deploymentConfig.owner).toBe("0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb");
     expect(deploymentConfig.feeRecipient).toBe(deploymentConfig.owner);
+    expect(deploymentConfig.feeRecipients).toEqual([
+      { address: deploymentConfig.owner, percentOfManagerSideAllocation: 100 }
+    ]);
   });
 
-  it("sets a 10% performance fee and a 1 EURC permanent lock", () => {
+  it("sets a 10% performance fee with Aave's 50/50 total-fee split", () => {
     expect(deploymentConfig.performanceFeeBps).toBe(1_000);
+    expect(deploymentConfig.aaveLabsAutomaticAllocationBps).toBe(5_000);
+    expect(deploymentConfig.intendedFeeAllocationBps).toEqual({
+      aaveLabs: 5_000,
+      configuredRecipient: 5_000
+    });
+    expect(deploymentConfig.feeRecipients[0].percentOfManagerSideAllocation).toBe(100);
+  });
+
+  it("sets a 1 EURC permanent lock", () => {
     expect(deploymentConfig.initialLockDeposit.amount).toBe("1");
     expect(deploymentConfig.initialLockDeposit.rawAmount).toBe(1_000_000n);
     expect(deploymentConfig.initialLockDeposit.permanentlyLocked).toBe(true);
