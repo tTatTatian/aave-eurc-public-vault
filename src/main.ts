@@ -106,6 +106,8 @@ app.innerHTML = `
       <p id="live-error" class="live-error" hidden></p>
     </section>
 
+    <section class="panel sdk-panel" id="aave-sdk-preflight"></section>
+
     <section class="panel details">
       <div>
         <p class="eyebrow">DEVELOPMENT CHECKLIST</p>
@@ -271,3 +273,7 @@ void loadLiveReserve();
 window.setInterval(() => {
   void loadLiveReserve();
 }, 60_000);
+
+
+// Mount the official Aave SDK preflight only after the dashboard DOM exists.
+void import("./aave-sdk-preflight");
