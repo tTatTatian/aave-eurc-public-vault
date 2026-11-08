@@ -14,6 +14,7 @@ export const deploymentConfig = {
   chainId: 8453,
   networkName: "Base Mainnet",
   owner: "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
+  deployer: "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
   feeRecipient: "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
   asset: {
     symbol: "EURC",
