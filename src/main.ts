@@ -27,7 +27,7 @@ app.innerHTML = `
       <p class="intro">A proposed public, non-custodial vault designed to supply EURC to Aave V3 on Base.</p>
       <div class="notice">
         <strong>Not deployed — no deposits accepted.</strong>
-        <span>Connect through Reown AppKit to select MetaMask or another WalletConnect-compatible wallet. The preview can request the exact 1 EURC allowance; vault deployment remains separate.</span>
+        <span>Read-only development preview. Wallet connection and token approvals are temporarily disabled while the dashboard is stabilized; vault deployment remains disabled.</span>
       </div>
     </section>
 
@@ -111,7 +111,7 @@ app.innerHTML = `
     <section class="panel details">
       <div>
         <p class="eyebrow">DEVELOPMENT CHECKLIST</p>
-        <h3>Wallet connection & deployment safety</h3>
+        <h3>Deployment safety</h3>
       </div>
       <ul>
         <li class="done">Base and EURC configuration recorded</li>
@@ -121,15 +121,15 @@ app.innerHTML = `
         <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated</li>
         <li class="done">Fee recipient calldata validation integrated</li>
         <li class="done">Configuration safety tests added — run in Codespaces</li>
-        <li>Reown AppKit wallet connection and exact 1 EURC approval flow integrated; browser testing pending</li>
+        <li>Wallet connection temporarily disabled while the dashboard is stabilized</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
-      <p class="footnote">Build status: ${developmentStatus.phase}. Reown wallet connection is available; vault deployment remains disabled.</p>
+      <p class="footnote">Build status: ${developmentStatus.phase}. Wallet connection is temporarily disabled; vault deployment remains disabled.</p>
     </section>
 
     <footer>
       <p>EURC supply rates vary and are not guaranteed. Smart-contract, protocol and liquidity risks apply.</p>
-      <p>Only the exact 1 EURC approval can be requested through the connected wallet. Vault deployment is not enabled in this preview.</p>
+      <p>Wallet approvals and vault deployment are disabled in this preview.</p>
     </footer>
   </main>
 `;
