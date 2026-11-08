@@ -333,16 +333,17 @@ function showPlanDetails(plan: any) {
     `;
     const connectButton = document.getElementById("connect-wallet") as HTMLButtonElement;
     const approveButton = document.getElementById("approve-exact-eurc") as HTMLButtonElement;
+    const walletStatus = document.getElementById("wallet-approval-status") as HTMLSpanElement;
     connectButton.addEventListener("click", () => {
       reownAppKit.open({ view: "Connect", namespace: "eip155" });
     });
     updateWalletApprovalUi();
     approveButton.addEventListener("click", async () => {
       approveButton.disabled = true;
-      walletStatus.textContent = "Check the transaction details in MetaMask…";
+      walletStatus.textContent = "Review the exact 1 EURC approval in your selected wallet…";
       try {
         const hash = await submitExactApproval(approval);
-        walletStatus.textContent = "Approval submitted: " + hash + ". Wait for confirmation, then rerun preflight.";
+        walletStatus.textContent = "Approval submitted: " + hash + ". Wait for Base confirmation, then rerun preflight.";
       } catch (error) {
         walletStatus.textContent = error instanceof Error ? error.message : "Approval not submitted.";
         approveButton.disabled = false;
