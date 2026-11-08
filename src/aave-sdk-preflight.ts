@@ -93,6 +93,14 @@ function decodeApproval(data: string): { spender: string; amount: bigint } | nul
   };
 }
 
+function encodeExactApproval(spender: string, amount: bigint): string {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(spender) || amount < 0n || amount >= 2n ** 256n) {
+    throw new Error("Cannot encode the proposed exact EURC approval.");
+  }
+  return "0x095ea7b3" + spender.slice(2).toLowerCase().padStart(64, "0") +
+    amount.toString(16).padStart(64, "0");
+}
+
 function approvalSafetyChecks(approval: any, deployment: any): [string, boolean][] {
   const decoded = decodeApproval(String(approval.data ?? ""));
   const factory = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
@@ -266,6 +274,27 @@ function showPlanDetails(plan: any) {
       : formatUnits(actualApprovalRaw - expectedApprovalRaw, deploymentConfig.asset.decimals);
     const safetyChecks = approvalSafetyChecks(approval, plan.originalTransaction);
     const safetyPassed = safetyChecks.every(([, passed]) => passed);
+    const factoryAddress = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
+    const exactApprovalData = encodeExactApproval(factoryAddress, expectedApprovalRaw);
+    const exactApprovalDecoded = decodeApproval(exactApprovalData);
+    const exactApprovalChecks: [string, boolean][] = [
+      ["Target is configured Base EURC", deploymentConfig.asset.address.toLowerCase() === String(approval.to).toLowerCase()],
+      ["Spender is the Aave vault factory", exactApprovalDecoded?.spender.toLowerCase() === factoryAddress],
+      ["Amount is exactly 1 EURC", exactApprovalDecoded?.amount === expectedApprovalRaw],
+      ["Sender is configured deployer", String(approval.from).toLowerCase() === deploymentConfig.deployer.toLowerCase()],
+      ["Chain is Base Mainnet (8453)", Number(approval.chainId) === 8453],
+      ["Native ETH value is zero", BigInt(String(approval.value ?? 0)) === 0n]
+    ];
+    const exactApprovalPassed = exactApprovalChecks.every(([, passed]) => passed);
+    const exactApprovalRows = exactApprovalChecks.map(([label, passed]) =>
+      '<div class="sdk-config-check"><span class="' + (passed ? "pass" : "fail") + '">' +
+      (passed ? "PASS" : "MISMATCH") + '</span><span>' + escapeHtml(label) + '</span></div>'
+    ).join("");
+    const exactApprovalTx = {
+      ...approval,
+      data: exactApprovalData,
+      operation: "Exact approval · 1 EURC · constructed locally, not sent"
+    };
     const safetyRows = safetyChecks.map(([label, passed]) =>
       '<div class="sdk-config-check"><span class="' + (passed ? "pass" : "fail") + '">' +
       (passed ? "PASS" : "MISMATCH") + '</span><span>' + escapeHtml(label) + '</span></div>'
@@ -294,6 +323,13 @@ function showPlanDetails(plan: any) {
         </dl>
         <p class="sdk-review-warning">Diagnostic only. The approval amount safety check remains fail-closed; do not approve if the amount differs from the configured 1 EURC.</p>
       </section>
+      <section class="sdk-detail-card">
+        <h4>Proposed exact EURC approval (not sent)</h4>
+        <p class="sdk-decode-status ${exactApprovalPassed ? "pass" : "fail"}">${exactApprovalPassed ? "Exact approval transaction checks passed" : "Exact approval checks failed — do not proceed"}</p>
+        <div class="sdk-config-checks">${exactApprovalRows}</div>
+        <p>Locally constructed ERC-20 approve(factory, 1,000,000). This is a separate exact-allowance proposal; the Aave SDK's unlimited-approval calldata above is not modified or submitted.</p>
+      </section>
+      ${transactionSummary("Proposed exact approval transaction (not sent)", exactApprovalTx)}
       <section class="sdk-detail-card">
         <h4>EURC allowance details</h4>
         <dl class="sdk-detail-grid">
