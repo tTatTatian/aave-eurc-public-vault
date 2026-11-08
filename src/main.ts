@@ -1,5 +1,4 @@
 import { vaultConfig, developmentStatus } from "./config";
-import { verifyMessage } from "ethers";
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -28,18 +27,15 @@ app.innerHTML = `
       <p class="intro">A proposed public, non-custodial vault designed to supply EURC to Aave V3 on Base.</p>
       <div class="notice">
         <strong>Not deployed — no deposits accepted.</strong>
-        <span>Read-only development preview. Wallet connection requires a fresh authentication signature each time; no token approvals, transactions or vault deployment are enabled.</span>
+        <span>Read-only development preview. Browser wallet connection is available for address and network detection only; token approvals, signing and vault deployment remain disabled.</span>
       </div>
       <div class="wallet-connect panel" aria-label="Browser wallet connection">
         <div>
           <p class="eyebrow">BROWSER WALLET</p>
           <strong id="wallet-status">Not connected</strong>
-          <p id="wallet-detail" class="muted">Connect your browser wallet and sign a fresh authentication message. No transaction or spending permission is requested.</p>
+          <p id="wallet-detail" class="muted">Connect MetaMask or another injected browser wallet. Read-only connection only.</p>
         </div>
-        <div class="wallet-actions">
-          <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
-          <button id="disconnect-wallet" class="disconnect-button" type="button" hidden>Disconnect wallet</button>
-        </div>
+        <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
       </div>
     </section>
 
@@ -133,15 +129,15 @@ app.innerHTML = `
         <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated</li>
         <li class="done">Fee recipient calldata validation integrated</li>
         <li class="done">Configuration safety tests added — run in Codespaces</li>
-        <li class="done">Browser wallet connection enabled with fresh message authentication on each connection</li>
+        <li class="done">Browser wallet connection enabled for address and network detection only</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
-      <p class="footnote">Build status: ${developmentStatus.phase}. Wallet authentication uses message signatures only; transaction signing, submission and vault deployment remain disabled.</p>
+      <p class="footnote">Build status: ${developmentStatus.phase}. Browser wallet connection is read-only; transaction signing, submission and vault deployment remain disabled.</p>
     </section>
 
     <footer>
       <p>EURC supply rates vary and are not guaranteed. Smart-contract, protocol and liquidity risks apply.</p>
-      <p>Wallet authentication uses message signatures only. Token approvals, transaction signing and vault deployment are disabled in this preview.</p>
+      <p>Wallet connection is read-only. Token approvals, transaction signing and vault deployment are disabled in this preview.</p>
     </footer>
   </main>
 `;
@@ -296,7 +292,6 @@ type InjectedWallet = {
 };
 
 const connectButton = getElement("connect-wallet") as HTMLButtonElement;
-const disconnectButton = getElement("disconnect-wallet") as HTMLButtonElement;
 const walletStatus = getElement("wallet-status");
 const walletDetail = getElement("wallet-detail");
 
@@ -305,7 +300,6 @@ function showWalletState(address: string | null, chainId: string | null) {
     walletStatus.textContent = "Not connected";
     walletDetail.textContent = "Connect MetaMask or another injected browser wallet. Read-only connection only.";
     connectButton.textContent = "Connect browser wallet";
-    disconnectButton.hidden = true;
     return;
   }
 
@@ -315,7 +309,6 @@ function showWalletState(address: string | null, chainId: string | null) {
     ? "Base Mainnet detected (Chain ID 8453). No transaction permissions requested."
     : `Detected chain ID ${chainId ?? "unknown"}. Switch to Base Mainnet (8453) in your wallet. No transaction permissions requested.`;
   connectButton.textContent = "Wallet connected";
-  disconnectButton.hidden = false;
 }
 
 connectButton.addEventListener("click", async () => {
@@ -330,60 +323,16 @@ connectButton.addEventListener("click", async () => {
   walletStatus.textContent = "Waiting for wallet connection…";
   try {
     const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
-    const address = accounts?.[0];
-    if (!address) throw new Error("The wallet did not return an account.");
-
     const chainId = await wallet.request({ method: "eth_chainId" }) as string;
-    if (Number(chainId) !== vaultConfig.chainId) {
-      showWalletState(address, chainId);
-      throw new Error("Switch your wallet to Base Mainnet (Chain ID 8453), then connect again to sign.");
-    }
-
-    // Generate a new challenge for every connection attempt. The signature
-    // authenticates this dashboard session; it is not a transaction approval.
-    const nonce = crypto.randomUUID();
-    const issuedAt = new Date().toISOString();
-    const message = [
-      `${vaultConfig.name} browser wallet authentication`,
-      "",
-      "Sign this message to authenticate this dashboard session.",
-      "This signature does not authorize token approvals, transfers, deposits, or contract deployment.",
-      "",
-      `Domain: ${window.location.host}`,
-      `Address: ${address}`,
-      `Chain ID: ${vaultConfig.chainId}`,
-      `Nonce: ${nonce}`,
-      `Issued At: ${issuedAt}`
-    ].join("\n");
-
-    walletStatus.textContent = "Waiting for authentication signature…";
-    walletDetail.textContent = "Review the message in your wallet. It is an authentication signature, not a transaction.";
-    const signature = await wallet.request({
-      method: "personal_sign",
-      params: [message, address]
-    }) as string;
-
-    const recoveredAddress = verifyMessage(message, signature);
-    if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
-      throw new Error("Signature verification failed: recovered address does not match the connected account.");
-    }
-
-    showWalletState(address, chainId);
-    walletStatus.textContent = `Authenticated · ${shortAddress(address)}`;
-    walletDetail.textContent = "Fresh signature verified for this connection. Disconnecting clears this session; reconnecting requires a new signature.";
+    showWalletState(accounts?.[0] ?? null, chainId ?? null);
+    // Intentionally avoid provider event subscriptions here. Some embedded
+    // browser previews proxy the injected provider and violate Proxy invariants
+    // when its "on" property is accessed. Reconnect to refresh account/network.
   } catch (error) {
-    walletStatus.textContent = "Authentication failed";
-    walletDetail.textContent = error instanceof Error ? error.message : "The wallet did not complete the signature request.";
+    walletStatus.textContent = "Wallet connection failed";
+    walletDetail.textContent = error instanceof Error ? error.message : "The wallet did not complete the connection request.";
     connectButton.textContent = "Connect browser wallet";
   } finally {
     connectButton.disabled = false;
   }
-});
-
-
-disconnectButton.addEventListener("click", () => {
-  // This clears the dashboard's displayed connection only. Injected wallets
-  // do not expose a standard programmatic disconnect/revoke-permission method.
-  showWalletState(null, null);
-  walletDetail.textContent = "Dashboard session cleared. Reconnecting will require a new signature. To revoke the site's account-access permission, manage connected sites in your wallet settings.";
 });
