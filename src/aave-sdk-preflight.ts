@@ -20,9 +20,9 @@ panel.innerHTML = `
       <div>
         <p class="eyebrow">OFFICIAL AAVE SDK · READ-ONLY PREFLIGHT</p>
         <h3>Simple Earn deployment check</h3>
-        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. This page never connects a wallet, signs, approves, or sends transactions.</p>
+        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. This page connects MetaMask only when you explicitly tap Connect MetaMask. It can request the exact 1 EURC approval after a separate tap and MetaMask confirmation; vault deployment is never submitted here.</p>
       </div>
-      <span class="sdk-status">No wallet connected</span>
+      <span class="sdk-status">Wallet connection optional</span>
     </div>
     <div class="sdk-config-grid">
       <div><span>SDK</span><strong>@aave/client 0.12.0</strong></div>
