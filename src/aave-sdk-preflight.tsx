@@ -22,10 +22,10 @@ const request: VaultDeployRequest = {
   initialFee: bigDecimal(deploymentConfig.performanceFeeBps / 100),
   shareName: deploymentConfig.vaultName,
   shareSymbol: deploymentConfig.shareTokenSymbol,
-  initialLockDeposit: bigDecimal(deploymentConfig.initialLockDeposit.amount),
+  initialLockDeposit: bigDecimal(Number(deploymentConfig.initialLockDeposit.amount)),
   recipients: deploymentConfig.feeRecipients.map((recipient) => ({
     address: evmAddress(recipient.address),
-    percent: bigDecimal(recipient.percentOfManagerSideAllocation)
+    percent: bigDecimal(Number(recipient.percentOfManagerSideAllocation))
   }))
 };
 
