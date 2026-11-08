@@ -7,11 +7,13 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test scripts/deployment-config.test.mjs",
-    "validate:deployment": "node scripts/validate-deployment-config.mjs"
+    "test": "vitest run",
+    "validate:deployment": "node scripts/validate-deployment-config.mjs",
+    "test:spec": "node --test scripts/deployment-config.test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vitest": "^3.2.4"
   }
 }
