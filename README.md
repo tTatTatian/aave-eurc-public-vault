@@ -25,7 +25,7 @@ A proposed public, non-custodial EURC yield vault on Base Mainnet, using Aave V3
 | Borrowing | Disabled |
 | Strategy | Aave V3 EURC supply only |
 
-The 1 EURC initial lock is permanently locked and cannot be withdrawn. It is not a refundable deposit.
+The 1 EURC initial lock is permanently locked and cannot be withdrawn. It is not a refundable deposit. The canonical machine-readable deployment settings are in `deployment/deployment-config.json`; `src/deployment-config.ts` contains typed application-side checks.
 
 ## Contract addresses
 
@@ -85,10 +85,12 @@ npm install
 npm run dev
 ```
 
-Run configuration tests:
+Run the configuration tests and validation checks:
 
 ```bash
 npm test
+npm run validate:deployment
+npm run test:spec
 ```
 
 Run the production build:
