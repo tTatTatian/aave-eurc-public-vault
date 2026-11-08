@@ -70,10 +70,15 @@ Implemented:
 3. Confirmed vault identity, owner, fee rate, recipient split and initial lock recorded in `src/deployment-config.ts`.
 4. Configuration safety tests added in `tests/deployment-config.test.ts`.
 
+Implemented in this stage:
+- Official `@aave/react` `useVaultDeploy` preflight is mounted in the dashboard.
+- The preflight rechecks the live Base EURC reserve and asks the Aave SDK to prepare a plan; it never sends the plan.
+- No wallet connector, transaction sender, signing hook, or private-key code is included.
+
 Still required:
-1. Integrate the official Aave Simple Earn deployment SDK/API and pin the exact SDK version.
-2. Verify the connected MetaMask address matches the confirmed deployer and owner, then check the reserve and recipient configuration in a preflight screen.
-3. Implement deployment preview and transaction review, with explicit approval required before wallet submission.
+1. Install and lock the official SDK dependencies in StackBlitz, then run the build and tests.
+2. Verify the connected MetaMask address matches the confirmed deployer and owner, then independently review the SDK-generated deployment plan.
+3. Implement deployment preview and transaction review, with explicit approval required before wallet submission. The current preflight deliberately stops before wallet connection or transaction submission.
 4. Add integration tests for the official SDK deployment plan and edge cases.
 5. Add contract-level tests for deposits, withdrawals, yield accounting, fee collection, fee recipient allocation, and permanently locked initial shares.
 6. Run unit tests, production build and independent contract/security review.
