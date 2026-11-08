@@ -91,3 +91,15 @@ Aave supply rates are variable and not guaranteed. The vault would introduce sma
 ---
 
 No deployment, wallet approval, or transaction is authorized by this repository documentation.
+
+## Deployment specification checks
+
+The repository also contains a machine-readable deployment record at `deployment/deployment-config.json`, an illustrative fee arithmetic helper, and a readiness checklist at `docs/deployment-readiness.md`. These are configuration and documentation only; they do not deploy or sign transactions.
+
+Run the checks with:
+
+```bash
+npm test
+npm run test:spec
+npm run validate:deployment
+```
