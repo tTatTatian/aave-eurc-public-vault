@@ -41,6 +41,48 @@ panel.innerHTML = `
 const resultElement = document.getElementById("sdk-result") as HTMLSpanElement;
 const planElement = document.getElementById("sdk-plan") as HTMLDivElement;
 const runButton = document.getElementById("run-aave-preflight") as HTMLButtonElement;
+let connectedWallet: string | null = null;
+const EURC_TOKEN = deploymentConfig.asset.address.toLowerCase();
+const FACTORY_SPENDER = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
+const EXACT_ALLOWANCE = 1_000_000n;
+
+async function connectMetaMask(): Promise<string> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum?.request) throw new Error("MetaMask provider not found. Open this project in MetaMask's browser.");
+  const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
+  const chain = String(await ethereum.request({ method: "eth_chainId" })).toLowerCase();
+  if (chain !== "0x2105") throw new Error("Switch MetaMask to Base Mainnet (chain ID 8453).");
+  const account = accounts?.[0];
+  if (!account || account.toLowerCase() !== deploymentConfig.deployer.toLowerCase()) {
+    throw new Error("Connected account does not match the configured deployer.");
+  }
+  connectedWallet = account;
+  return account;
+}
+
+async function submitExactApproval(approval: any): Promise<string> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum?.request || !connectedWallet) throw new Error("Connect the configured MetaMask wallet first.");
+  const chain = String(await ethereum.request({ method: "eth_chainId" })).toLowerCase();
+  const accounts = await ethereum.request({ method: "eth_accounts" }) as string[];
+  const data = String(approval.data ?? "");
+  const match = /^0x095ea7b3([0-9a-fA-F]{64})([0-9a-fA-F]{64})$/i.exec(data);
+  if (chain !== "0x2105" ||
+      accounts?.[0]?.toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
+      String(approval.from).toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
+      String(approval.to).toLowerCase() !== EURC_TOKEN ||
+      approvalSpender(data)?.toLowerCase() !== FACTORY_SPENDER ||
+      !match || BigInt("0x" + match[2]) !== EXACT_ALLOWANCE ||
+      Number(approval.chainId) !== 8453 ||
+      BigInt(String(approval.value ?? 0)) !== 0n) {
+    throw new Error("Approval did not match the exact reviewed Base EURC, factory, sender and 1-EURC parameters. Nothing was sent.");
+  }
+  return await ethereum.request({
+    method: "eth_sendTransaction",
+    params: [{ from: connectedWallet, to: approval.to, data, value: "0x0" }]
+  }) as string;
+}
+
 
 const client = AaveClient.create({ environment: production });
 
@@ -227,9 +269,14 @@ function showPlanDetails(plan: any) {
       : "Could not safely decode the spender from the approval calldata";
     planElement.innerHTML = `
       <div class="sdk-plan-intro">
-        <strong>Approval required · review only</strong>
+        <strong>Approval required · MetaMask connection available</strong>
         <p>${escapeHtml(plan.reason)}</p>
-        <p>No transaction has been submitted. The approval and deployment requests below are displayed for inspection only.</p>
+        <p>Connect the configured wallet, then request only the exact 1 EURC approval. This control never submits the vault deployment.</p>
+        <div class="sdk-action-row">
+          <button id="connect-metamask" class="refresh-button" type="button">Connect MetaMask</button>
+          <button id="approve-exact-eurc" class="refresh-button" type="button" disabled>Approve exactly 1 EURC</button>
+          <span id="wallet-approval-status" class="sdk-result" role="status" aria-live="polite">Wallet not connected</span>
+        </div>
       </div>
       <section class="sdk-detail-card">
         <h4>EURC allowance details</h4>
@@ -244,8 +291,34 @@ function showPlanDetails(plan: any) {
       ${transactionSummary("Approval transaction (not sent)", approval)}
       ${transactionSummary("Vault deployment transaction (not sent)", plan.originalTransaction)}
       ${showDecodedDeployment(String(plan.originalTransaction.data ?? ""))}
-      <p class="sdk-review-warning">Safety check: confirm the chain is Base (8453), the sender matches the configured deployer, the token is the EURC contract, and the decoded spender matches the intended Aave deployment flow. Do not approve if any field is unexpected.</p>
+      <p class="sdk-review-warning">Safety check: only the exact 1 EURC approval is enabled here. The deployment transaction remains review-only and cannot be submitted by this button.</p>
     `;
+    const connectButton = document.getElementById("connect-metamask") as HTMLButtonElement;
+    const approveButton = document.getElementById("approve-exact-eurc") as HTMLButtonElement;
+    const walletStatus = document.getElementById("wallet-approval-status") as HTMLSpanElement;
+    connectButton.addEventListener("click", async () => {
+      connectButton.disabled = true;
+      try {
+        const account = await connectMetaMask();
+        walletStatus.textContent = "Connected: " + account;
+        approveButton.disabled = false;
+      } catch (error) {
+        walletStatus.textContent = error instanceof Error ? error.message : "Connection failed.";
+      } finally {
+        connectButton.disabled = false;
+      }
+    });
+    approveButton.addEventListener("click", async () => {
+      approveButton.disabled = true;
+      walletStatus.textContent = "Check the transaction details in MetaMask…";
+      try {
+        const hash = await submitExactApproval(approval);
+        walletStatus.textContent = "Approval submitted: " + hash + ". Wait for confirmation, then rerun preflight.";
+      } catch (error) {
+        walletStatus.textContent = error instanceof Error ? error.message : "Approval not submitted.";
+        approveButton.disabled = false;
+      }
+    });
   } else if (plan.__typename === "TransactionRequest") {
     planElement.innerHTML = `
       <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. Review the destination and sender before any wallet action.</p></div>
