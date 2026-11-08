@@ -331,6 +331,12 @@ function showPlanDetails(plan: any) {
       </section>
       ${transactionSummary("Proposed exact approval transaction (not sent)", exactApprovalTx)}
       <section class="sdk-detail-card">
+        <h4>Submit exact 1 EURC approval</h4>
+        <p>This sends only the locally constructed approve(factory, 1 EURC) transaction. It never sends the Aave SDK's unlimited-allowance calldata and does not deploy the vault.</p>
+        <button id="submit-exact-eurc-approval" class="refresh-button" type="button" ${exactApprovalPassed ? "" : "disabled"}>Approve exactly 1 EURC</button>
+        <p id="exact-approval-status" class="sdk-result" role="status" aria-live="polite">No approval transaction submitted.</p>
+      </section>
+      <section class="sdk-detail-card">
         <h4>EURC allowance details</h4>
         <dl class="sdk-detail-grid">
           <div><dt>Token contract (approval transaction target)</dt><dd><code>${escapeHtml(approval.to)}</code></dd></div>
@@ -358,6 +364,51 @@ function showPlanDetails(plan: any) {
       "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
   }
   planElement.hidden = false;
+
+  const exactApprovalButton = document.getElementById("submit-exact-eurc-approval") as HTMLButtonElement | null;
+  const exactApprovalStatus = document.getElementById("exact-approval-status") as HTMLParagraphElement | null;
+  exactApprovalButton?.addEventListener("click", async () => {
+    if (!exactApprovalButton || !exactApprovalStatus) return;
+    exactApprovalButton.disabled = true;
+    exactApprovalStatus.textContent = "Checking connected wallet and exact approval parameters…";
+    try {
+      const ethereum = (window as Window & { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown> } }).ethereum;
+      if (!ethereum) throw new Error("No injected browser wallet found. Open the dashboard in Brave with your wallet enabled.");
+
+      const accounts = await ethereum.request({ method: "eth_accounts" }) as string[];
+      const account = accounts?.[0];
+      if (!account) throw new Error("No wallet account is connected. Connect your wallet first.");
+      if (account.toLowerCase() !== deploymentConfig.deployer.toLowerCase()) {
+        throw new Error("Connected account does not match the configured vault deployer.");
+      }
+
+      const chainHex = String(await ethereum.request({ method: "eth_chainId" }));
+      if (chainHex.toLowerCase() !== "0x2105" && Number(chainHex) !== 8453) {
+        throw new Error("Wallet is not on Base Mainnet (8453). Reconnect and switch networks first.");
+      }
+      if (!exactApprovalPassed || !exactApprovalDecoded ||
+          exactApprovalDecoded.spender.toLowerCase() !== factoryAddress ||
+          exactApprovalDecoded.amount !== expectedApprovalRaw ||
+          String(approval.to).toLowerCase() !== deploymentConfig.asset.address.toLowerCase()) {
+        throw new Error("Exact approval safety checks failed. Transaction blocked.");
+      }
+
+      exactApprovalStatus.textContent = "Review the exact 1 EURC approval in your wallet…";
+      const txHash = await ethereum.request({
+        method: "eth_sendTransaction",
+        params: [{
+          from: account,
+          to: deploymentConfig.asset.address,
+          data: exactApprovalData,
+          value: "0x0"
+        }]
+      }) as string;
+      exactApprovalStatus.textContent = "Wallet submitted the exact 1 EURC approval. Transaction: " + txHash;
+    } catch (error) {
+      exactApprovalStatus.textContent = error instanceof Error ? error.message : "Approval was not submitted.";
+      exactApprovalButton.disabled = false;
+    }
+  });
 }
 
 function showError(message: string) {
