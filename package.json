@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test scripts/deployment-config.test.mjs",
     "validate:deployment": "node scripts/validate-deployment-config.mjs",
-    "test:spec": "node --test scripts/deployment-config.test.mjs"
+    "test:spec": "node --test scripts/deployment-config.test.mjs",
+    "preflight:aave": "node scripts/aave-sdk-live-preflight.mjs"
   },
   "devDependencies": {
     "typescript": "^5.7.3",
