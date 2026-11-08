@@ -34,5 +34,8 @@ jobs:
       - name: Validate deployment configuration
         run: npm run validate:deployment
 
+      - name: Run read-only Aave SDK live preflight
+        run: npm run preflight:aave
+
       - name: Build production bundle
         run: npm run build
