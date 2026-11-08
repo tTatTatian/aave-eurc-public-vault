@@ -57,3 +57,19 @@ footer p { margin-bottom: 6px; }
   .status-pill { margin-top: 2px; }
   .live-heading { flex-direction: column; }
 }
+
+.sdk-panel { margin-top: 18px; }
+.sdk-preflight { color: #edf3fb; }
+.sdk-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sdk-heading h3 { margin-bottom: 7px; }
+.sdk-heading .muted { max-width: 700px; line-height: 1.6; }
+.sdk-status { border: 1px solid #557568; border-radius: 999px; padding: 7px 11px; color: #c8f2e4; background: #183329; font-size: 11px; white-space: nowrap; }
+.sdk-config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.sdk-config-grid > div { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 13px; border: 1px solid #27374b; border-radius: 10px; background: #0d1928; }
+.sdk-config-grid span { color: #8fa5bd; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.sdk-config-grid code { overflow-wrap: anywhere; }
+.sdk-config-grid strong { font-size: 13px; }
+.sdk-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.sdk-result { color: #a8d9cc; font-size: 12px; }
+.sdk-plan { margin: 16px 0 0; color: #c8f2e4; font-size: 13px; line-height: 1.6; }
+@media (max-width: 520px) { .sdk-config-grid { grid-template-columns: 1fr; } .sdk-heading { flex-direction: column; } }
