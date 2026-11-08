@@ -35,7 +35,10 @@ app.innerHTML = `
           <strong id="wallet-status">Not connected</strong>
           <p id="wallet-detail" class="muted">Connect MetaMask or another injected browser wallet. Read-only connection only.</p>
         </div>
-        <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
+        <div class="wallet-actions">
+          <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
+          <button id="disconnect-wallet" class="disconnect-button" type="button" hidden>Disconnect wallet</button>
+        </div>
       </div>
     </section>
 
@@ -292,6 +295,7 @@ type InjectedWallet = {
 };
 
 const connectButton = getElement("connect-wallet") as HTMLButtonElement;
+const disconnectButton = getElement("disconnect-wallet") as HTMLButtonElement;
 const walletStatus = getElement("wallet-status");
 const walletDetail = getElement("wallet-detail");
 
@@ -300,6 +304,7 @@ function showWalletState(address: string | null, chainId: string | null) {
     walletStatus.textContent = "Not connected";
     walletDetail.textContent = "Connect MetaMask or another injected browser wallet. Read-only connection only.";
     connectButton.textContent = "Connect browser wallet";
+    disconnectButton.hidden = true;
     return;
   }
 
@@ -309,6 +314,7 @@ function showWalletState(address: string | null, chainId: string | null) {
     ? "Base Mainnet detected (Chain ID 8453). No transaction permissions requested."
     : `Detected chain ID ${chainId ?? "unknown"}. Switch to Base Mainnet (8453) in your wallet. No transaction permissions requested.`;
   connectButton.textContent = "Wallet connected";
+  disconnectButton.hidden = false;
 }
 
 connectButton.addEventListener("click", async () => {
@@ -376,4 +382,12 @@ connectButton.addEventListener("click", async () => {
   } finally {
     connectButton.disabled = false;
   }
+});
+
+
+disconnectButton.addEventListener("click", () => {
+  // Clears this dashboard's local connection display only. Injected EVM
+  // wallets do not provide a standard programmatic permission-revocation API.
+  showWalletState(null, null);
+  walletDetail.textContent = "Disconnected from this dashboard. To revoke this site's wallet permission, manage connected sites in your wallet settings.";
 });
