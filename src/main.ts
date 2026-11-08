@@ -119,7 +119,7 @@ app.innerHTML = `
         <li>Official Simple Earn deployment integration — pending SDK/API verification</li>
         <li>Fee recipient recorded; protocol fee allocation — pending SDK/API verification</li>
         <li class="done">Configuration safety tests added — run in StackBlitz</li>
-        <li>Contract and integration tests — pending</li>
+        <li>Configuration tests added; contract and SDK integration tests — pending</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
       <p class="footnote">Build status: ${developmentStatus.phase}. No wallet connection, deposit, approval or transaction signing is enabled.</p>
