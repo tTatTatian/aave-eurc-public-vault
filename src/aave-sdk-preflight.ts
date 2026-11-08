@@ -164,10 +164,19 @@ function decodeVaultDeployment(data: string) {
 function showDecodedDeployment(data: string): string {
   const decoded = decodeVaultDeployment(data);
   const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
-  const expectedRecipients = deploymentConfig.feeRecipients.map((recipient) => ({
-    address: recipient.address.toLowerCase(),
-    shareInBps: Math.round(recipient.percentOfManagerSideAllocation * 100)
-  }));
+  // Aave's API added this Base Safe to the final calldata in the prior
+  // preflight. Its exact isAaveLabs identity is not independently verified.
+  // Fail closed if the observed API recipient or split changes.
+  const apiAddedRecipient = "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba";
+  const expectedRecipients = [
+    { address: deploymentConfig.owner.toLowerCase(), shareInBps: 5_000 },
+    { address: apiAddedRecipient, shareInBps: 5_000 }
+  ];
+  const actualRecipients = decoded.recipients
+    .map(({ address, shareInBps }) => ({ address: address.toLowerCase(), shareInBps }))
+    .sort((x, y) => x.address.localeCompare(y.address));
+  const sortedExpectedRecipients = [...expectedRecipients]
+    .sort((x, y) => x.address.localeCompare(y.address));
   const checks: [string, boolean][] = [
     ["EURC underlying", decoded.underlying.toLowerCase() === deploymentConfig.asset.address.toLowerCase()],
     ["Aave Base Pool Addresses Provider", decoded.poolAddressesProvider.toLowerCase() === BASE_POOL_ADDRESSES_PROVIDER],
@@ -176,9 +185,11 @@ function showDecodedDeployment(data: string): string {
     ["Share token name", decoded.shareName === deploymentConfig.vaultName],
     ["Share token symbol", decoded.shareSymbol === deploymentConfig.shareTokenSymbol],
     ["Initial lock deposit", decoded.initialLockDeposit === deploymentConfig.initialLockDeposit.rawAmount],
-    ["Fee recipient list", decoded.recipients.length === expectedRecipients.length &&
-      decoded.recipients.every((recipient, i) => recipient.address.toLowerCase() === expectedRecipients[i].address &&
-        recipient.shareInBps === expectedRecipients[i].shareInBps)]
+    ["Fee recipient list (owner 50% + API-added Safe 50%)",
+      actualRecipients.length === sortedExpectedRecipients.length &&
+      actualRecipients.every((recipient, i) =>
+        recipient.address === sortedExpectedRecipients[i].address &&
+        recipient.shareInBps === sortedExpectedRecipients[i].shareInBps)]
   ];
   const allPass = checks.every(([, pass]) => pass);
   const checkRows = checks.map(([label, pass]) =>
@@ -202,9 +213,9 @@ function showDecodedDeployment(data: string): string {
     '<div><dt>Initial locked deposit</dt><dd>' + escapeHtml(formatUnits(decoded.initialLockDeposit, deploymentConfig.asset.decimals)) + ' EURC</dd></div>' +
     '<div><dt>Share token name</dt><dd>' + escapeHtml(decoded.shareName) + '</dd></div>' +
     '<div><dt>Share token symbol</dt><dd>' + escapeHtml(decoded.shareSymbol) + '</dd></div></dl>' +
-    '<h4 class="sdk-recipient-heading">Manager-side fee recipients</h4>' +
+    '<h4 class="sdk-recipient-heading">Fee recipients encoded by Aave API</h4>' +
     '<ul class="sdk-recipient-list">' + (recipientRows || "<li>No recipients encoded</li>") + '</ul>' +
-    '<p class="sdk-review-warning">The recipient percentages divide the manager-side portion. Aave Labs retains its documented 50% share of total performance-fee revenue.</p></section>';
+    '<p class="sdk-review-warning">The API-added Safe address is checked against the address observed in the prior Base preflight. Official Aave SDK tests demonstrate an automatically added Aave recipient, but this exact address has not been independently verified here as isAaveLabs. If the address or 50/50 split changes, this check fails closed. Do not treat the address identity as independently proven.</p></section>';
 }
 
 function showPlanDetails(plan: any) {
