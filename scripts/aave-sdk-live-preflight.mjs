@@ -91,8 +91,10 @@ async function main() {
   } else if (plan.__typename === "TransactionRequest") {
     console.log("RESULT: API accepted configuration; a deployment transaction request was prepared.");
   } else if (plan.__typename === "InsufficientBalanceError") {
-    console.log("RESULT: deployment configuration reached the API, but the deployer balance is insufficient for the required amount.");
-    fail("Insufficient deployer balance for deployment plan.");
+    console.log(`RESULT: API returned InsufficientBalanceError.`);
+    console.log(`Required EURC: ${plan.required.value}`);
+    console.log(`Available EURC: ${plan.available.value}`);
+    console.log("BLOCKER: The deployer wallet needs enough EURC for the initial lock deposit.");
   } else {
     console.log("RESULT: SDK returned an unrecognized plan type; manual review required.");
     fail("Unrecognized SDK plan type.");
