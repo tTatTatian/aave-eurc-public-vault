@@ -39,8 +39,8 @@ test("recipient allocation totals 100% and names only the owner", () => {
   assert.equal(config.vault.feeRecipients[0].percent, 100);
 });
 
-test("deployment stays blocked until a deployer is supplied and separately approved", () => {
-  assert.equal(config.deployment.deployerAddress, null);
+test("confirmed owner is recorded as deployer while deployment stays blocked", () => {
+  assert.equal(config.deployment.deployerAddress, config.vault.owner);
   assert.equal(config.deployment.walletConnectionEnabled, false);
   assert.equal(config.deployment.signingEnabled, false);
   assert.equal(config.deployment.broadcastEnabled, false);
