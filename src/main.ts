@@ -118,10 +118,10 @@ app.innerHTML = `
         <li class="done">Aave V3 Pool and aToken addresses recorded</li>
         <li class="done">Live Aave reserve data connected (read-only)</li>
         <li class="done">Vault name, share symbol, owner, fee rate and initial lock recorded</li>
-        <li>Official Simple Earn deployment integration — pending SDK/API verification</li>
-        <li>Fee recipient recorded; protocol fee allocation — pending SDK/API verification</li>
-        <li class="done">Configuration safety tests added — run in StackBlitz</li>
-        <li>Configuration tests added; contract and SDK integration tests — pending</li>
+        <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated (read-only)</li>
+        <li class="done">Official SDK fee and recipient parameters wired into preflight; API validation pending</li>
+        <li class="done">Configuration safety tests added — run in Codespaces</li>
+        <li>SDK live preflight test and contract-level tests — pending execution/review</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
       <p class="footnote">Build status: ${developmentStatus.phase}. No wallet connection, deposit, approval or transaction signing is enabled.</p>
