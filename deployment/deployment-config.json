@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "project": "Aave EURC Public Vault",
+  "network": {
+    "name": "Base Mainnet",
+    "chainId": 8453
+  },
+  "reserve": {
+    "market": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5",
+    "underlyingToken": "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42",
+    "symbol": "EURC",
+    "decimals": 6,
+    "aToken": "0x90DA57E0A6C0d166Bf15764E03b83745Dc90025B"
+  },
+  "vault": {
+    "owner": "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
+    "shareName": "Y.L. Aave Eurc Vault Shares",
+    "shareSymbol": "ylEurc",
+    "initialFeePercent": 10,
+    "initialLockDeposit": "1.0",
+    "feeRecipients": [
+      {
+        "address": "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
+        "percent": 100
+      }
+    ]
+  },
+  "deployment": {
+    "deployerAddress": null,
+    "walletConnectionEnabled": false,
+    "signingEnabled": false,
+    "broadcastEnabled": false,
+    "readyToDeploy": false
+  },
+  "feeModel": {
+    "aaveLabsSharePercentOfTotalFee": 50,
+    "recipientPoolPercentOfTotalFee": 50,
+    "ownerSharePercentOfRecipientPool": 100
+  }
+}
