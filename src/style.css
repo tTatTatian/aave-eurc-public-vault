@@ -103,3 +103,9 @@ footer p { margin-bottom: 6px; }
 .sdk-recipient-list { margin: 0; padding-left: 18px; color: #d1dce9; font-size: 12px; }
 .sdk-recipient-list li { margin: 6px 0; overflow-wrap: anywhere; }
 @media (max-width: 520px) { .sdk-config-checks { grid-template-columns: 1fr; } }
+
+
+.wallet-connect { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; }
+.wallet-connect strong { display: block; margin-bottom: 6px; overflow-wrap: anywhere; }
+.wallet-connect .muted { margin: 0; line-height: 1.5; }
+@media (max-width: 520px) { .wallet-connect { align-items: stretch; flex-direction: column; } .wallet-connect button { width: 100%; } }
