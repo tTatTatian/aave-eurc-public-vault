@@ -86,6 +86,127 @@ function approvalSpender(data: string): string | null {
   return "0x" + match[1].slice(24);
 }
 
+
+const BASE_POOL_ADDRESSES_PROVIDER = "0xe20fcBdbfFC4Dd138cE8b2E6FBb6CB49777ad64D".toLowerCase();
+const DEPLOY_VAULT_SELECTOR = "0x81d42dea";
+
+function readAbiWord(body: string, byteOffset: number): bigint {
+  const start = byteOffset * 2;
+  const word = body.slice(start, start + 64);
+  if (word.length !== 64) throw new Error("Deployment calldata is truncated.");
+  return BigInt("0x" + word);
+}
+
+function readAbiAddress(body: string, byteOffset: number): string {
+  return "0x" + readAbiWord(body, byteOffset).toString(16).padStart(64, "0").slice(-40);
+}
+
+function readAbiString(body: string, tupleStart: number, relativeOffset: bigint): string {
+  const position = tupleStart + Number(relativeOffset);
+  const length = Number(readAbiWord(body, position));
+  if (!Number.isSafeInteger(length) || length < 0 || length > 1024) {
+    throw new Error("Unexpected string length in deployment calldata.");
+  }
+  const start = (position + 32) * 2;
+  const hex = body.slice(start, start + length * 2);
+  if (hex.length !== length * 2) throw new Error("Deployment string is truncated.");
+  const bytes = Uint8Array.from(hex.match(/.{2}/g) ?? [], (pair) => parseInt(pair, 16));
+  return new TextDecoder().decode(bytes);
+}
+
+function formatUnits(raw: bigint, decimals: number): string {
+  const base = 10n ** BigInt(decimals);
+  const whole = raw / base;
+  const fraction = (raw % base).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return fraction ? whole.toString() + "." + fraction : whole.toString();
+}
+
+function formatWadPercent(raw: bigint): string {
+  const scaled = raw * 100n;
+  const whole = scaled / 10n ** 18n;
+  const fraction = (scaled % 10n ** 18n).toString().padStart(18, "0").replace(/0+$/, "");
+  return fraction ? whole.toString() + "." + fraction + "%" : whole.toString() + "%";
+}
+
+function decodeVaultDeployment(data: string) {
+  if (!data.toLowerCase().startsWith(DEPLOY_VAULT_SELECTOR)) {
+    throw new Error("Deployment calldata selector is not ATokenVaultFactory.deployVault(tuple).");
+  }
+  const body = data.slice(10);
+  const tupleStart = Number(readAbiWord(body, 0));
+  if (!Number.isSafeInteger(tupleStart) || tupleStart < 32) throw new Error("Invalid tuple offset.");
+  const at = (index: number) => tupleStart + index * 32;
+  const underlying = readAbiAddress(body, at(0));
+  const referralCode = readAbiWord(body, at(1));
+  const poolAddressesProvider = readAbiAddress(body, at(2));
+  const owner = readAbiAddress(body, at(3));
+  const initialFee = readAbiWord(body, at(4));
+  const shareName = readAbiString(body, tupleStart, readAbiWord(body, at(5)));
+  const shareSymbol = readAbiString(body, tupleStart, readAbiWord(body, at(6)));
+  const initialLockDeposit = readAbiWord(body, at(7));
+  const recipientsOffset = readAbiWord(body, at(8));
+  const recipientsStart = tupleStart + Number(recipientsOffset);
+  const recipientCount = Number(readAbiWord(body, recipientsStart));
+  if (!Number.isSafeInteger(recipientCount) || recipientCount < 0 || recipientCount > 32) {
+    throw new Error("Unexpected fee-recipient count in deployment calldata.");
+  }
+  const recipients = Array.from({ length: recipientCount }, (_, index) => {
+    const entry = recipientsStart + 32 + index * 64;
+    return {
+      address: readAbiAddress(body, entry),
+      shareInBps: Number(readAbiWord(body, entry + 32))
+    };
+  });
+  return { underlying, referralCode: referralCode.toString(), poolAddressesProvider, owner,
+    initialFee, shareName, shareSymbol, initialLockDeposit, recipients };
+}
+
+function showDecodedDeployment(data: string): string {
+  const decoded = decodeVaultDeployment(data);
+  const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
+  const expectedRecipients = deploymentConfig.feeRecipients.map((recipient) => ({
+    address: recipient.address.toLowerCase(),
+    shareInBps: Math.round(recipient.percentOfManagerSideAllocation * 100)
+  }));
+  const checks: [string, boolean][] = [
+    ["EURC underlying", decoded.underlying.toLowerCase() === deploymentConfig.asset.address.toLowerCase()],
+    ["Aave Base Pool Addresses Provider", decoded.poolAddressesProvider.toLowerCase() === BASE_POOL_ADDRESSES_PROVIDER],
+    ["Vault owner", decoded.owner.toLowerCase() === deploymentConfig.owner.toLowerCase()],
+    ["Initial performance fee", decoded.initialFee === expectedFee],
+    ["Share token name", decoded.shareName === deploymentConfig.vaultName],
+    ["Share token symbol", decoded.shareSymbol === deploymentConfig.shareTokenSymbol],
+    ["Initial lock deposit", decoded.initialLockDeposit === deploymentConfig.initialLockDeposit.rawAmount],
+    ["Fee recipient list", decoded.recipients.length === expectedRecipients.length &&
+      decoded.recipients.every((recipient, i) => recipient.address.toLowerCase() === expectedRecipients[i].address &&
+        recipient.shareInBps === expectedRecipients[i].shareInBps)]
+  ];
+  const allPass = checks.every(([, pass]) => pass);
+  const checkRows = checks.map(([label, pass]) =>
+    '<div class="sdk-config-check"><span class="' + (pass ? "pass" : "fail") + '">' +
+    (pass ? "PASS" : "MISMATCH") + '</span><span>' + escapeHtml(label) + '</span></div>'
+  ).join("");
+  const recipientRows = decoded.recipients.map((recipient) =>
+    '<li><code>' + escapeHtml(recipient.address) + '</code> — ' +
+    escapeHtml((recipient.shareInBps / 100).toFixed(2)) + '% of manager-side allocation</li>'
+  ).join("");
+  return '<section class="sdk-detail-card"><h4>Decoded vault deployment configuration</h4>' +
+    '<p class="sdk-decode-status ' + (allPass ? "pass" : "fail") + '">' +
+    (allPass ? "All configured deployment parameters match" : "One or more deployment parameters do not match — do not proceed") +
+    '</p><div class="sdk-config-checks">' + checkRows + '</div>' +
+    '<dl class="sdk-detail-grid sdk-decoded-grid">' +
+    '<div><dt>Underlying asset</dt><dd><code>' + escapeHtml(decoded.underlying) + '</code></dd></div>' +
+    '<div><dt>Pool Addresses Provider</dt><dd><code>' + escapeHtml(decoded.poolAddressesProvider) + '</code></dd></div>' +
+    '<div><dt>Owner</dt><dd><code>' + escapeHtml(decoded.owner) + '</code></dd></div>' +
+    '<div><dt>Referral code</dt><dd>' + escapeHtml(decoded.referralCode) + '</dd></div>' +
+    '<div><dt>Initial performance fee</dt><dd>' + escapeHtml(formatWadPercent(decoded.initialFee)) + '</dd></div>' +
+    '<div><dt>Initial locked deposit</dt><dd>' + escapeHtml(formatUnits(decoded.initialLockDeposit, deploymentConfig.asset.decimals)) + ' EURC</dd></div>' +
+    '<div><dt>Share token name</dt><dd>' + escapeHtml(decoded.shareName) + '</dd></div>' +
+    '<div><dt>Share token symbol</dt><dd>' + escapeHtml(decoded.shareSymbol) + '</dd></div></dl>' +
+    '<h4 class="sdk-recipient-heading">Manager-side fee recipients</h4>' +
+    '<ul class="sdk-recipient-list">' + (recipientRows || "<li>No recipients encoded</li>") + '</ul>' +
+    '<p class="sdk-review-warning">The recipient percentages divide the manager-side portion. Aave Labs retains its documented 50% share of total performance-fee revenue.</p></section>';
+}
+
 function showPlanDetails(plan: any) {
   if (plan.__typename === "ApprovalRequired") {
     const approval = plan.approval;
@@ -111,6 +232,7 @@ function showPlanDetails(plan: any) {
       </section>
       ${transactionSummary("Approval transaction (not sent)", approval)}
       ${transactionSummary("Vault deployment transaction (not sent)", plan.originalTransaction)}
+      ${showDecodedDeployment(String(plan.originalTransaction.data ?? ""))}
       <p class="sdk-review-warning">Safety check: confirm the chain is Base (8453), the sender matches the configured deployer, the token is the EURC contract, and the decoded spender matches the intended Aave deployment flow. Do not approve if any field is unexpected.</p>
     `;
   } else if (plan.__typename === "TransactionRequest") {
