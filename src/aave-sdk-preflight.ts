@@ -254,6 +254,16 @@ function showPlanDetails(plan: any) {
     const spenderHtml = spender
       ? escapeHtml(spender)
       : "Could not safely decode the spender from the approval calldata";
+    const decodedApproval = decodeApproval(String(approval.data ?? ""));
+    const expectedApprovalRaw = deploymentConfig.initialLockDeposit.rawAmount;
+    const actualApprovalRaw = decodedApproval?.amount ?? null;
+    const actualApprovalFormatted = actualApprovalRaw === null
+      ? "Unable to decode approval amount"
+      : formatUnits(actualApprovalRaw, deploymentConfig.asset.decimals);
+    const expectedApprovalFormatted = formatUnits(expectedApprovalRaw, deploymentConfig.asset.decimals);
+    const approvalDifference = actualApprovalRaw === null
+      ? "Unavailable"
+      : formatUnits(actualApprovalRaw - expectedApprovalRaw, deploymentConfig.asset.decimals);
     const safetyChecks = approvalSafetyChecks(approval, plan.originalTransaction);
     const safetyPassed = safetyChecks.every(([, passed]) => passed);
     const safetyRows = safetyChecks.map(([label, passed]) =>
@@ -270,6 +280,19 @@ function showPlanDetails(plan: any) {
         <h4>Final transaction safety checks</h4>
         <p class="sdk-decode-status ${safetyPassed ? "pass" : "fail"}">${safetyPassed ? "All approval and deployment transaction checks passed" : "A transaction check failed — do not proceed"}</p>
         <div class="sdk-config-checks">${safetyRows}</div>
+      </section>
+      <section class="sdk-detail-card">
+        <h4>Decoded approval amount diagnostic</h4>
+        <dl class="sdk-detail-grid">
+          <div><dt>Actual amount in calldata (raw units)</dt><dd><code>${actualApprovalRaw === null ? "Undecodable" : actualApprovalRaw.toString()}</code></dd></div>
+          <div><dt>Actual approval amount</dt><dd>${escapeHtml(actualApprovalFormatted)} EURC</dd></div>
+          <div><dt>Expected amount in configuration (raw units)</dt><dd><code>${expectedApprovalRaw.toString()}</code></dd></div>
+          <div><dt>Expected approval amount</dt><dd>${escapeHtml(expectedApprovalFormatted)} EURC</dd></div>
+          <div><dt>Difference (actual − expected)</dt><dd>${escapeHtml(approvalDifference)} EURC</dd></div>
+          <div><dt>SDK required allowance</dt><dd>${escapeHtml(plan.requiredAmount.value)} EURC</dd></div>
+          <div><dt>SDK allowance decimals</dt><dd>${escapeHtml(plan.requiredAmount.decimals)}</dd></div>
+        </dl>
+        <p class="sdk-review-warning">Diagnostic only. The approval amount safety check remains fail-closed; do not approve if the amount differs from the configured 1 EURC.</p>
       </section>
       <section class="sdk-detail-card">
         <h4>EURC allowance details</h4>
