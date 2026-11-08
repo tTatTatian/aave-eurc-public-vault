@@ -16,6 +16,7 @@ A proposed public, non-custodial EURC yield vault on Base Mainnet, using Aave V3
 | Deposits | Intended to be public |
 | Performance fee | 10% of generated yield, not principal |
 | Owner | `0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb` |
+| Deployer | Same confirmed wallet as owner |
 | Fee recipient | Same as owner |
 | Recipient split | 100% of the manager-side allocation |
 | Aave Labs allocation | 50% of total performance-fee revenue |
@@ -56,7 +57,7 @@ Official references:
 - No private keys or seed phrases are collected, stored, or handled.
 - Wallet interaction is intended to be through MetaMask.
 - No approval, deposit, withdrawal, deployment, or other transaction may be signed or submitted without explicit user approval.
-- The current application remains read-only. It does not connect a wallet or execute transactions.
+- The confirmed deployer address is recorded in configuration, but the current application remains read-only. It does not connect a wallet or execute transactions. Recording the deployer is not permission to connect, sign, or broadcast.
 - Deployment must use the official Aave Simple Earn SDK/API; a hand-written clone is not the intended route.
 
 ## Development status
@@ -71,7 +72,7 @@ Implemented:
 
 Still required:
 1. Integrate the official Aave Simple Earn deployment SDK/API and pin the exact SDK version.
-2. Verify the connected deployer, owner, reserve and recipient configuration in a preflight screen.
+2. Verify the connected MetaMask address matches the confirmed deployer and owner, then check the reserve and recipient configuration in a preflight screen.
 3. Implement deployment preview and transaction review, with explicit approval required before wallet submission.
 4. Add integration tests for the official SDK deployment plan and edge cases.
 5. Add contract-level tests for deposits, withdrawals, yield accounting, fee collection, fee recipient allocation, and permanently locked initial shares.
