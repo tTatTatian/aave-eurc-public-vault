@@ -138,7 +138,7 @@ async function runPreflight() {
         `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No wallet was connected and no approval or transaction was submitted.`;
     } else {
       planElement.textContent =
-        `The SDK returned plan type: ${plan.__typename}. No transaction was signed or submitted. Review the returned plan type before any future wallet integration.`;
+        "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Aave SDK preflight error.";
