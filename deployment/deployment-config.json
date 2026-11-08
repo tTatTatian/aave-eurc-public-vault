@@ -26,7 +26,7 @@
     ]
   },
   "deployment": {
-    "deployerAddress": null,
+    "deployerAddress": "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
     "walletConnectionEnabled": false,
     "signingEnabled": false,
     "broadcastEnabled": false,
