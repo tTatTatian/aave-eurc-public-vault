@@ -1,11 +1,12 @@
 /**
- * Proposed deployment parameters for the Aave EURC Public Vault.
+ * Prepared Aave Simple Earn deployment parameters.
  *
- * This file is configuration only. It does not deploy contracts, connect a
- * wallet, request approvals, or submit transactions.
+ * Configuration only: no wallet connection, approvals, deployment or
+ * transaction submission is performed by this module.
  *
- * Fee allocation values are the intended configuration and must be checked
- * against the exact official Aave Simple Earn SDK/API version before deployment.
+ * Aave's documented SDK/API recipient split is applied to the manager-side
+ * 50% of total fee revenue. A 100% split to this single owner recipient means
+ * the owner receives 50% of total fees and Aave Labs receives 50%.
  */
 export const deploymentConfig = {
   vaultName: "Y.L. Aave Eurc Vault Shares",
@@ -24,6 +25,13 @@ export const deploymentConfig = {
     aToken: "0x90DA57E0A6C0d166Bf15764E03b83745Dc90025B"
   },
   performanceFeeBps: 1_000,
+  aaveLabsAutomaticAllocationBps: 5_000,
+  feeRecipients: [
+    {
+      address: "0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb",
+      percentOfManagerSideAllocation: 100
+    }
+  ],
   intendedFeeAllocationBps: {
     aaveLabs: 5_000,
     configuredRecipient: 5_000
@@ -62,6 +70,22 @@ export function validateDeploymentConfig() {
     deploymentConfig.intendedFeeAllocationBps.aaveLabs +
     deploymentConfig.intendedFeeAllocationBps.configuredRecipient;
   if (allocationTotal !== 10_000) errors.push("Intended fee allocations must total 10,000 basis points.");
+
+  const recipientSplitTotal = deploymentConfig.feeRecipients.reduce(
+    (total, recipient) => total + recipient.percentOfManagerSideAllocation,
+    0
+  );
+  if (recipientSplitTotal !== 100) {
+    errors.push("Fee recipient splits must total 100% of the manager-side allocation.");
+  }
+  if (deploymentConfig.feeRecipients.some((recipient) => !addressPattern.test(recipient.address))) {
+    errors.push("Every fee recipient must be a valid EVM address.");
+  }
+  if (deploymentConfig.feeRecipients.length !== 1 ||
+      deploymentConfig.feeRecipients[0].address.toLowerCase() !== deploymentConfig.owner.toLowerCase()) {
+    errors.push("The owner must be the sole recipient of the manager-side fee allocation.");
+  }
+
   if (deploymentConfig.asset.decimals !== 6 || deploymentConfig.initialLockDeposit.rawAmount !== 1_000_000n) {
     errors.push("The 1 EURC lock deposit must equal 1,000,000 raw units for a 6-decimal token.");
   }
