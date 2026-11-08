@@ -27,7 +27,7 @@ app.innerHTML = `
       <p class="intro">A proposed public, non-custodial vault designed to supply EURC to Aave V3 on Base.</p>
       <div class="notice">
         <strong>Not deployed — no deposits accepted.</strong>
-        <span>This preview is informational only. It does not connect a wallet or submit transactions.</span>
+        <span>Connect through Reown AppKit to select MetaMask or another WalletConnect-compatible wallet. The preview can request the exact 1 EURC allowance; vault deployment remains separate.</span>
       </div>
     </section>
 
@@ -111,25 +111,25 @@ app.innerHTML = `
     <section class="panel details">
       <div>
         <p class="eyebrow">DEVELOPMENT CHECKLIST</p>
-        <h3>Read-only integration</h3>
+        <h3>Wallet connection & deployment safety</h3>
       </div>
       <ul>
         <li class="done">Base and EURC configuration recorded</li>
         <li class="done">Aave V3 Pool and aToken addresses recorded</li>
         <li class="done">Live Aave reserve data connected (read-only)</li>
         <li class="done">Vault name, share symbol, owner, fee rate and initial lock recorded</li>
-        <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated (read-only)</li>
-        <li class="done">Official SDK fee and recipient parameters wired into preflight; API validation pending</li>
+        <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated</li>
+        <li class="done">Fee recipient calldata validation integrated</li>
         <li class="done">Configuration safety tests added — run in Codespaces</li>
-        <li>SDK live preflight test and contract-level tests — pending execution/review</li>
+        <li>Reown AppKit wallet connection and exact 1 EURC approval flow integrated; browser testing pending</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
-      <p class="footnote">Build status: ${developmentStatus.phase}. No wallet connection, deposit, approval or transaction signing is enabled.</p>
+      <p class="footnote">Build status: ${developmentStatus.phase}. Reown wallet connection is available; vault deployment remains disabled.</p>
     </section>
 
     <footer>
       <p>EURC supply rates vary and are not guaranteed. Smart-contract, protocol and liquidity risks apply.</p>
-      <p>Wallet connection and transaction execution are intentionally disabled in this version.</p>
+      <p>Only the exact 1 EURC approval can be requested through the connected wallet. Vault deployment is not enabled in this preview.</p>
     </footer>
   </main>
 `;
