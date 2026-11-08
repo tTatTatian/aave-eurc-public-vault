@@ -289,7 +289,6 @@ void import("./aave-sdk-preflight");
 
 type InjectedWallet = {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  on?: (event: string, listener: (...args: unknown[]) => void) => void;
 };
 
 const connectButton = getElement("connect-wallet") as HTMLButtonElement;
@@ -326,22 +325,13 @@ connectButton.addEventListener("click", async () => {
     const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
     const chainId = await wallet.request({ method: "eth_chainId" }) as string;
     showWalletState(accounts?.[0] ?? null, chainId ?? null);
-
-    wallet.on?.("accountsChanged", (...args: unknown[]) => {
-      const nextAccounts = args[0] as string[];
-      void wallet.request({ method: "eth_chainId" }).then((nextChain) =>
-        showWalletState(nextAccounts?.[0] ?? null, String(nextChain ?? ""))
-      );
-    });
-    wallet.on?.("chainChanged", (...args: unknown[]) => {
-      const nextChain = String(args[0] ?? "");
-      void wallet.request({ method: "eth_accounts" }).then((currentAccounts) =>
-        showWalletState((currentAccounts as string[])?.[0] ?? null, nextChain)
-      );
-    });
+    // Intentionally avoid provider event subscriptions here. Some embedded
+    // browser previews proxy the injected provider and violate Proxy invariants
+    // when its "on" property is accessed. Reconnect to refresh account/network.
   } catch (error) {
-    walletStatus.textContent = "Wallet connection cancelled or unavailable";
+    walletStatus.textContent = "Wallet connection failed";
     walletDetail.textContent = error instanceof Error ? error.message : "The wallet did not complete the connection request.";
+    connectButton.textContent = "Connect browser wallet";
   } finally {
     connectButton.disabled = false;
   }
