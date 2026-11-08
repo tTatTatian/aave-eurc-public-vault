@@ -115,9 +115,10 @@ app.innerHTML = `
         <li class="done">Base and EURC configuration recorded</li>
         <li class="done">Aave V3 Pool and aToken addresses recorded</li>
         <li class="done">Live Aave reserve data connected (read-only)</li>
-        <li>Official Simple Earn deployment integration — pending verification</li>
-        <li>Fee recipient and protocol fee allocation — pending verification</li>
-        <li>Vault name, share symbol, owner and initial locked deposit — pending</li>
+        <li class="done">Vault name, share symbol, owner, fee rate and initial lock recorded</li>
+        <li>Official Simple Earn deployment integration — pending SDK/API verification</li>
+        <li>Fee recipient recorded; protocol fee allocation — pending SDK/API verification</li>
+        <li class="done">Configuration safety tests added — run in StackBlitz</li>
         <li>Contract and integration tests — pending</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
