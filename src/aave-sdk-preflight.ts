@@ -20,7 +20,7 @@ panel.innerHTML = `
       <div>
         <p class="eyebrow">OFFICIAL AAVE SDK · READ-ONLY PREFLIGHT</p>
         <h3>Simple Earn deployment check</h3>
-        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. The plan is never sent, signed or approved here.</p>
+        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. This page never connects a wallet, signs, approves, or sends transactions.</p>
       </div>
       <span class="sdk-status">No wallet connected</span>
     </div>
@@ -34,15 +34,99 @@ panel.innerHTML = `
       <button id="run-aave-preflight" class="refresh-button" type="button">Run official Aave preflight</button>
       <span id="sdk-result" class="sdk-result" role="status" aria-live="polite">Ready · no wallet or transaction functionality loaded</span>
     </div>
-    <p id="sdk-plan" class="sdk-plan" hidden></p>
+    <div id="sdk-plan" class="sdk-plan" hidden></div>
   </div>
 `;
 
 const resultElement = document.getElementById("sdk-result") as HTMLSpanElement;
-const planElement = document.getElementById("sdk-plan") as HTMLParagraphElement;
+const planElement = document.getElementById("sdk-plan") as HTMLDivElement;
 const runButton = document.getElementById("run-aave-preflight") as HTMLButtonElement;
 
 const client = AaveClient.create({ environment: production });
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character] ?? character);
+}
+
+function transactionSummary(label: string, tx: {
+  to: string;
+  from: string;
+  data: string;
+  value: string | number | bigint;
+  chainId: number;
+  operation?: string | null;
+}): string {
+  const data = String(tx.data ?? "");
+  const selector = /^0x[0-9a-fA-F]{8}/.test(data) ? data.slice(0, 10) : "Unavailable";
+  const byteLength = data.startsWith("0x") ? Math.max(0, (data.length - 2) / 2) : 0;
+  return `
+    <section class="sdk-detail-card">
+      <h4>${escapeHtml(label)}</h4>
+      <dl class="sdk-detail-grid">
+        <div><dt>Network / chain ID</dt><dd>${escapeHtml(tx.chainId)} ${tx.chainId === 8453 ? "· Base" : ""}</dd></div>
+        <div><dt>Contract called (to)</dt><dd><code>${escapeHtml(tx.to)}</code></dd></div>
+        <div><dt>Expected sender (from)</dt><dd><code>${escapeHtml(tx.from)}</code></dd></div>
+        <div><dt>Native value</dt><dd>${escapeHtml(String(tx.value))}</dd></div>
+        <div><dt>SDK operation</dt><dd>${escapeHtml(tx.operation || "Not specified")}</dd></div>
+        <div><dt>Calldata selector / size</dt><dd><code>${escapeHtml(selector)}</code> · ${escapeHtml(byteLength)} bytes (calldata hidden)</dd></div>
+      </dl>
+    </section>`;
+}
+
+function approvalSpender(data: string): string | null {
+  // ERC-20 approve(address,uint256): selector + 32-byte address + 32-byte amount.
+  const match = /^0x095ea7b3([0-9a-fA-F]{64})([0-9a-fA-F]{64})$/i.exec(data);
+  if (!match) return null;
+  return "0x" + match[1].slice(24);
+}
+
+function showPlanDetails(plan: any) {
+  if (plan.__typename === "ApprovalRequired") {
+    const approval = plan.approval;
+    const spender = approvalSpender(String(approval.data ?? ""));
+    const spenderHtml = spender
+      ? escapeHtml(spender)
+      : "Could not safely decode the spender from the approval calldata";
+    planElement.innerHTML = `
+      <div class="sdk-plan-intro">
+        <strong>Approval required · review only</strong>
+        <p>${escapeHtml(plan.reason)}</p>
+        <p>No transaction has been submitted. The approval and deployment requests below are displayed for inspection only.</p>
+      </div>
+      <section class="sdk-detail-card">
+        <h4>EURC allowance details</h4>
+        <dl class="sdk-detail-grid">
+          <div><dt>Token contract (approval transaction target)</dt><dd><code>${escapeHtml(approval.to)}</code></dd></div>
+          <div><dt>Spender (decoded from approve calldata)</dt><dd><code>${spenderHtml}</code></dd></div>
+          <div><dt>Required allowance</dt><dd>${escapeHtml(plan.requiredAmount.value)} EURC</dd></div>
+          <div><dt>Current allowance</dt><dd>${escapeHtml(plan.currentAllowance.value)} EURC</dd></div>
+          <div><dt>Allowance decimals</dt><dd>${escapeHtml(plan.requiredAmount.decimals)}</dd></div>
+        </dl>
+      </section>
+      ${transactionSummary("Approval transaction (not sent)", approval)}
+      ${transactionSummary("Vault deployment transaction (not sent)", plan.originalTransaction)}
+      <p class="sdk-review-warning">Safety check: confirm the chain is Base (8453), the sender matches the configured deployer, the token is the EURC contract, and the decoded spender matches the intended Aave deployment flow. Do not approve if any field is unexpected.</p>
+    `;
+  } else if (plan.__typename === "TransactionRequest") {
+    planElement.innerHTML = `
+      <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. Review the destination and sender before any wallet action.</p></div>
+      ${transactionSummary("Vault deployment transaction (not sent)", plan)}
+    `;
+  } else if (plan.__typename === "InsufficientBalanceError") {
+    planElement.textContent =
+      `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No wallet was connected and no approval or transaction was submitted.`;
+  } else {
+    planElement.textContent =
+      "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
+  }
+  planElement.hidden = false;
+}
 
 function showError(message: string) {
   resultElement.textContent = "Preflight failed";
@@ -125,21 +209,7 @@ async function runPreflight() {
 
     const plan = deployResult.value;
     resultElement.textContent = "Aave SDK returned a deployment plan · nothing was sent";
-    planElement.hidden = false;
-
-    if (plan.__typename === "ApprovalRequired") {
-      planElement.textContent =
-        "The SDK indicates an approval step is required before deployment. This app has not requested approval, connected a wallet, signed, or sent either transaction. The 1 EURC initial lock was accepted by the API for plan generation.";
-    } else if (plan.__typename === "TransactionRequest") {
-      planElement.textContent =
-        "The SDK prepared a deployment transaction request without a separate approval step. The 1 EURC initial lock was accepted by the API for plan generation. Transaction data is intentionally not exposed or submitted by this preflight.";
-    } else if (plan.__typename === "InsufficientBalanceError") {
-      planElement.textContent =
-        `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No wallet was connected and no approval or transaction was submitted.`;
-    } else {
-      planElement.textContent =
-        "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
-    }
+    showPlanDetails(plan);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Aave SDK preflight error.";
     showError(message);
