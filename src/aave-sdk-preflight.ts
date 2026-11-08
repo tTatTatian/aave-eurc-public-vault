@@ -351,20 +351,6 @@ function showPlanDetails(plan: any) {
       ${showDecodedDeployment(String(plan.originalTransaction.data ?? ""))}
       <p class="sdk-review-warning">Read-only safety mode: neither the approval nor the vault deployment can be submitted from this application.</p>
     `;
-  } else if (plan.__typename === "TransactionRequest") {
-    planElement.innerHTML = `
-      <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. Review the destination and sender before any wallet action.</p></div>
-      ${transactionSummary("Vault deployment transaction (not sent)", plan)}
-    `;
-  } else if (plan.__typename === "InsufficientBalanceError") {
-    planElement.textContent =
-      `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No approval or transaction was submitted.`;
-  } else {
-    planElement.textContent =
-      "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
-  }
-  planElement.hidden = false;
-
   const exactApprovalButton = document.getElementById("submit-exact-eurc-approval") as HTMLButtonElement | null;
   const exactApprovalStatus = document.getElementById("exact-approval-status") as HTMLParagraphElement | null;
   exactApprovalButton?.addEventListener("click", async () => {
@@ -409,6 +395,21 @@ function showPlanDetails(plan: any) {
       exactApprovalButton.disabled = false;
     }
   });
+
+  } else if (plan.__typename === "TransactionRequest") {
+    planElement.innerHTML = `
+      <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. Review the destination and sender before any wallet action.</p></div>
+      ${transactionSummary("Vault deployment transaction (not sent)", plan)}
+    `;
+  } else if (plan.__typename === "InsufficientBalanceError") {
+    planElement.textContent =
+      `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No approval or transaction was submitted.`;
+  } else {
+    planElement.textContent =
+      "The SDK returned an unsupported deployment-plan shape. No transaction was signed or submitted. Manual review is required.";
+  }
+  planElement.hidden = false;
+
 }
 
 function showError(message: string) {
