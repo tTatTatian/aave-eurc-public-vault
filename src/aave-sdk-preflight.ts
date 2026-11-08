@@ -60,10 +60,11 @@ panel.innerHTML = `
 const resultElement = document.getElementById("sdk-result") as HTMLSpanElement;
 const planElement = document.getElementById("sdk-plan") as HTMLDivElement;
 const runButton = document.getElementById("run-aave-preflight") as HTMLButtonElement;
-let connectedWallet: string | null = reownAppKit.getAddress() ?? null;
-let connectedChainId: number | null = reownAppKit.getChainId() ?? null;
+const initialAccount = reownAppKit.getAccount("eip155");
+let connectedWallet: string | null = initialAccount?.address ?? null;
+let connectedChainId: number | null = Number(reownAppKit.getChainId() ?? NaN);
 let walletProvider: any = reownAppKit.getWalletProvider();
-let walletConnected = reownAppKit.getIsConnected();
+let walletConnected = Boolean(initialAccount?.isConnected);
 const EURC_TOKEN = deploymentConfig.asset.address.toLowerCase();
 const FACTORY_SPENDER = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
 const EXACT_ALLOWANCE = 1_000_000n;
@@ -87,11 +88,19 @@ function updateWalletApprovalUi() {
   }
 }
 
-reownAppKit.subscribeProvider((state: any) => {
-  walletProvider = state.provider ?? null;
+reownAppKit.subscribeAccount((state: any) => {
   connectedWallet = state.address ?? null;
-  connectedChainId = state.chainId == null ? null : Number(state.chainId);
   walletConnected = Boolean(state.isConnected);
+  updateWalletApprovalUi();
+}, "eip155");
+
+reownAppKit.subscribeNetwork((state: any) => {
+  connectedChainId = state.chainId == null ? null : Number(state.chainId);
+  updateWalletApprovalUi();
+});
+
+reownAppKit.subscribeProviders((providers: any) => {
+  walletProvider = providers?.eip155 ?? null;
   updateWalletApprovalUi();
 });
 
