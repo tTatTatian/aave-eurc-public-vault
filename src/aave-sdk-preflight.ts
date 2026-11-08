@@ -84,6 +84,37 @@ function approvalSpender(data: string): string | null {
   return "0x" + match[1].slice(24);
 }
 
+function decodeApproval(data: string): { spender: string; amount: bigint } | null {
+  const match = /^0x095ea7b3([0-9a-fA-F]{64})([0-9a-fA-F]{64})$/i.exec(data);
+  if (!match) return null;
+  return {
+    spender: "0x" + match[1].slice(24),
+    amount: BigInt("0x" + match[2])
+  };
+}
+
+function approvalSafetyChecks(approval: any, deployment: any): [string, boolean][] {
+  const decoded = decodeApproval(String(approval.data ?? ""));
+  const factory = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
+  const expectedAmount = deploymentConfig.initialLockDeposit.rawAmount;
+  const deployData = String(deployment?.data ?? "");
+  const deploySelector = /^0x[0-9a-fA-F]{8}/.test(deployData) ? deployData.slice(0, 10).toLowerCase() : "";
+  return [
+    ["Approval targets configured Base EURC token", String(approval.to).toLowerCase() === deploymentConfig.asset.address.toLowerCase()],
+    ["Approval sender matches configured deployer", String(approval.from).toLowerCase() === deploymentConfig.deployer.toLowerCase()],
+    ["Approval chain is Base Mainnet (8453)", Number(approval.chainId) === 8453],
+    ["Approval sends zero native ETH", BigInt(String(approval.value ?? 0)) === 0n],
+    ["Approval calldata is exact ERC-20 approve(address,uint256)", decoded !== null],
+    ["Approval spender is the Aave vault factory", decoded?.spender.toLowerCase() === factory],
+    ["Approval amount is exactly 1 EURC (1,000,000 raw units)", decoded?.amount === expectedAmount],
+    ["Deployment targets the Aave vault factory", String(deployment?.to).toLowerCase() === factory],
+    ["Deployment sender matches configured deployer", String(deployment?.from).toLowerCase() === deploymentConfig.deployer.toLowerCase()],
+    ["Deployment chain is Base Mainnet (8453)", Number(deployment?.chainId) === 8453],
+    ["Deployment sends zero native ETH", BigInt(String(deployment?.value ?? 0)) === 0n],
+    ["Deployment selector is VAULT_DEPLOYED", deploySelector === DEPLOY_VAULT_SELECTOR]
+  ];
+}
+
 
 const BASE_POOL_ADDRESSES_PROVIDER = "0xe20fcBdbfFC4Dd138cE8b2E6FBb6CB49777ad64D".toLowerCase();
 const DEPLOY_VAULT_SELECTOR = "0x81d42dea";
@@ -223,12 +254,23 @@ function showPlanDetails(plan: any) {
     const spenderHtml = spender
       ? escapeHtml(spender)
       : "Could not safely decode the spender from the approval calldata";
+    const safetyChecks = approvalSafetyChecks(approval, plan.originalTransaction);
+    const safetyPassed = safetyChecks.every(([, passed]) => passed);
+    const safetyRows = safetyChecks.map(([label, passed]) =>
+      '<div class="sdk-config-check"><span class="' + (passed ? "pass" : "fail") + '">' +
+      (passed ? "PASS" : "MISMATCH") + '</span><span>' + escapeHtml(label) + '</span></div>'
+    ).join("");
     planElement.innerHTML = `
       <div class="sdk-plan-intro">
         <strong>Approval required · review only</strong>
         <p>${escapeHtml(plan.reason)}</p>
         <p>The Aave SDK indicates that an EURC allowance is required. Wallet connection and approval submission are disabled in this version. No transaction has been sent.</p>
       </div>
+      <section class="sdk-detail-card">
+        <h4>Final transaction safety checks</h4>
+        <p class="sdk-decode-status ${safetyPassed ? "pass" : "fail"}">${safetyPassed ? "All approval and deployment transaction checks passed" : "A transaction check failed — do not proceed"}</p>
+        <div class="sdk-config-checks">${safetyRows}</div>
+      </section>
       <section class="sdk-detail-card">
         <h4>EURC allowance details</h4>
         <dl class="sdk-detail-grid">
