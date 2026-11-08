@@ -17,12 +17,15 @@ A proposed public, non-custodial EURC yield vault on Base Mainnet, using Aave V3
 | Performance fee | 10% of generated yield, not principal |
 | Owner | `0xc9afCD8eFAbee5A24f7a306bFc6108af4E337Ccb` |
 | Fee recipient | Same as owner |
+| Recipient split | 100% of the manager-side allocation |
+| Aave Labs allocation | 50% of total performance-fee revenue |
+| Owner allocation | 50% of total performance-fee revenue |
 | Initial locked deposit | 1 EURC (1,000,000 raw units) |
 | Leverage | Disabled |
 | Borrowing | Disabled |
 | Strategy | Aave V3 EURC supply only |
 
-The 1 EURC initial lock is intended to remain permanently locked. It is not a refundable deposit.
+The 1 EURC initial lock is permanently locked and cannot be withdrawn. It is not a refundable deposit.
 
 ## Contract addresses
 
@@ -30,11 +33,19 @@ The 1 EURC initial lock is intended to remain permanently locked. It is not a re
 - Aave V3 Pool: `0xA238Dd80C259a72e81d7e4664a9801593F98d1c5`
 - Aave EURC aToken: `0x90DA57E0A6C0d166Bf15764E03b83745Dc90025B`
 
-## Fee allocation — pending SDK/API verification
+## Fee allocation
 
-The intended fee is 10% of realized yield. The intended allocation currently recorded in `src/deployment-config.ts` is 50% of fee revenue to Aave Labs and 50% to the configured owner/fee recipient.
+The official Aave Simple Earn deployment guide documents that Aave Labs receives 50% of total performance-fee revenue. The remaining 50% is split among the configured recipients.
 
-**This allocation is a proposed configuration, not a verified on-chain setting.** Before deployment, it must be checked against the exact version of Aave's official Simple Earn deployment SDK/API and its fee-recipient parameters. Do not assume the owner automatically receives a particular share until that check is complete.
+This project configures the owner wallet as the sole recipient with a 100% split of that manager-side allocation. Therefore, for every 100 EURC of total collected fee revenue:
+- Aave Labs receives 50 EURC.
+- The configured owner wallet receives 50 EURC.
+
+The 10% performance fee applies to yield, not depositor principal. Example: 100 EURC of realized yield produces 10 EURC total fee revenue; 5 EURC goes to Aave Labs and 5 EURC to the owner.
+
+Official references:
+- [Aave Simple Earn deployment guide](https://aave.com/docs/vaults/simple-earn/deploy)
+- [Aave Simple Earn overview](https://aave.com/docs/vaults/simple-earn/overview)
 
 ## Architecture and safety constraints
 
@@ -46,6 +57,7 @@ The intended fee is 10% of realized yield. The intended allocation currently rec
 - Wallet interaction is intended to be through MetaMask.
 - No approval, deposit, withdrawal, deployment, or other transaction may be signed or submitted without explicit user approval.
 - The current application remains read-only. It does not connect a wallet or execute transactions.
+- Deployment must use the official Aave Simple Earn SDK/API; a hand-written clone is not the intended route.
 
 ## Development status
 
@@ -54,16 +66,17 @@ Status: configuration and read-only dashboard in development. **Not deployed.**
 Implemented:
 1. Base/EURC/Aave V3 configuration.
 2. Read-only live Aave EURC reserve dashboard.
-3. Confirmed vault identity, owner, fee rate, and initial lock recorded in `src/deployment-config.ts`.
+3. Confirmed vault identity, owner, fee rate, recipient split and initial lock recorded in `src/deployment-config.ts`.
 4. Configuration safety tests added in `tests/deployment-config.test.ts`.
 
 Still required:
-1. Verify the official Aave Simple Earn deployment SDK/API, supported Base configuration, and exact version.
-2. Verify fee calculation, collection timing, protocol allocation, and recipient semantics from the actual SDK/contracts.
-3. Implement the deployment adapter only after that verification.
-4. Add contract-level tests for deposits, withdrawals, yield accounting, fee collection, fee recipient allocation, and permanently locked initial shares.
-5. Run unit tests, build, and independent contract/security review.
-6. Review the final deployment transaction and obtain explicit approval before any wallet action.
+1. Integrate the official Aave Simple Earn deployment SDK/API and pin the exact SDK version.
+2. Verify the connected deployer, owner, reserve and recipient configuration in a preflight screen.
+3. Implement deployment preview and transaction review, with explicit approval required before wallet submission.
+4. Add integration tests for the official SDK deployment plan and edge cases.
+5. Add contract-level tests for deposits, withdrawals, yield accounting, fee collection, fee recipient allocation, and permanently locked initial shares.
+6. Run unit tests, production build and independent contract/security review.
+7. Review the final deployment transaction and obtain explicit approval before any wallet action.
 
 ## Local development
 
@@ -91,15 +104,3 @@ Aave supply rates are variable and not guaranteed. The vault would introduce sma
 ---
 
 No deployment, wallet approval, or transaction is authorized by this repository documentation.
-
-## Deployment specification checks
-
-The repository also contains a machine-readable deployment record at `deployment/deployment-config.json`, an illustrative fee arithmetic helper, and a readiness checklist at `docs/deployment-readiness.md`. These are configuration and documentation only; they do not deploy or sign transactions.
-
-Run the checks with:
-
-```bash
-npm test
-npm run test:spec
-npm run validate:deployment
-```
