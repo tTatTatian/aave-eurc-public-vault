@@ -73,3 +73,19 @@ footer p { margin-bottom: 6px; }
 .sdk-result { color: #a8d9cc; font-size: 12px; }
 .sdk-plan { margin: 16px 0 0; color: #c8f2e4; font-size: 13px; line-height: 1.6; }
 @media (max-width: 520px) { .sdk-config-grid { grid-template-columns: 1fr; } .sdk-heading { flex-direction: column; } }
+
+
+/* Read-only Aave SDK execution-plan inspection */
+.sdk-plan { margin: 18px 0 0; color: #c8d5e5; font-size: 13px; line-height: 1.6; }
+.sdk-plan-intro { margin-bottom: 14px; padding: 14px 16px; border: 1px solid #725b36; border-radius: 10px; background: #2a2419; color: #f3d9a8; }
+.sdk-plan-intro strong { display: block; margin-bottom: 5px; }
+.sdk-plan-intro p { margin: 5px 0 0; color: #d6c5a5; }
+.sdk-detail-card { margin-top: 12px; padding: 15px; border: 1px solid #34465d; border-radius: 10px; background: #0d1928; }
+.sdk-detail-card h4 { margin: 0 0 12px; color: #e8f0fa; font-size: 14px; }
+.sdk-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.sdk-detail-grid > div { min-width: 0; }
+.sdk-detail-grid dt { margin-bottom: 4px; color: #8fa5bd; font-size: 11px; }
+.sdk-detail-grid dd { margin: 0; color: #e1eaf5; overflow-wrap: anywhere; font-size: 12px; }
+.sdk-detail-grid code { overflow-wrap: anywhere; }
+.sdk-review-warning { margin: 14px 0 0; padding: 12px 14px; border-left: 3px solid #c69b51; background: #211e19; color: #e5d2ad; font-size: 12px; }
+@media (max-width: 520px) { .sdk-detail-grid { grid-template-columns: 1fr; } }
