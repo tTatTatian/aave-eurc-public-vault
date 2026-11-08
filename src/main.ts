@@ -27,7 +27,15 @@ app.innerHTML = `
       <p class="intro">A proposed public, non-custodial vault designed to supply EURC to Aave V3 on Base.</p>
       <div class="notice">
         <strong>Not deployed — no deposits accepted.</strong>
-        <span>Read-only development preview. Wallet connection and token approvals are temporarily disabled while the dashboard is stabilized; vault deployment remains disabled.</span>
+        <span>Read-only development preview. Browser wallet connection is available for address and network detection only; token approvals, signing and vault deployment remain disabled.</span>
+      </div>
+      <div class="wallet-connect panel" aria-label="Browser wallet connection">
+        <div>
+          <p class="eyebrow">BROWSER WALLET</p>
+          <strong id="wallet-status">Not connected</strong>
+          <p id="wallet-detail" class="muted">Connect MetaMask or another injected browser wallet. Read-only connection only.</p>
+        </div>
+        <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
       </div>
     </section>
 
@@ -121,15 +129,15 @@ app.innerHTML = `
         <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated</li>
         <li class="done">Fee recipient calldata validation integrated</li>
         <li class="done">Configuration safety tests added — run in Codespaces</li>
-        <li>Wallet connection temporarily disabled while the dashboard is stabilized</li>
+        <li class="done">Browser wallet connection enabled for address and network detection only</li>
         <li>Deployment review and explicit approval — pending</li>
       </ul>
-      <p class="footnote">Build status: ${developmentStatus.phase}. Wallet connection is temporarily disabled; vault deployment remains disabled.</p>
+      <p class="footnote">Build status: ${developmentStatus.phase}. Browser wallet connection is read-only; transaction signing, submission and vault deployment remain disabled.</p>
     </section>
 
     <footer>
       <p>EURC supply rates vary and are not guaranteed. Smart-contract, protocol and liquidity risks apply.</p>
-      <p>Wallet approvals and vault deployment are disabled in this preview.</p>
+      <p>Wallet connection is read-only. Token approvals, transaction signing and vault deployment are disabled in this preview.</p>
     </footer>
   </main>
 `;
@@ -277,3 +285,64 @@ window.setInterval(() => {
 
 // Mount the official Aave SDK preflight only after the dashboard DOM exists.
 void import("./aave-sdk-preflight");
+
+
+type InjectedWallet = {
+  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+  on?: (event: string, listener: (...args: unknown[]) => void) => void;
+};
+
+const connectButton = getElement("connect-wallet") as HTMLButtonElement;
+const walletStatus = getElement("wallet-status");
+const walletDetail = getElement("wallet-detail");
+
+function showWalletState(address: string | null, chainId: string | null) {
+  if (!address) {
+    walletStatus.textContent = "Not connected";
+    walletDetail.textContent = "Connect MetaMask or another injected browser wallet. Read-only connection only.";
+    connectButton.textContent = "Connect browser wallet";
+    return;
+  }
+
+  const isBase = chainId?.toLowerCase() === "0x2105" || Number(chainId) === 8453;
+  walletStatus.textContent = isBase ? `Connected · ${shortAddress(address)}` : `Connected · ${shortAddress(address)} · wrong network`;
+  walletDetail.textContent = isBase
+    ? "Base Mainnet detected (Chain ID 8453). No transaction permissions requested."
+    : `Detected chain ID ${chainId ?? "unknown"}. Switch to Base Mainnet (8453) in your wallet. No transaction permissions requested.`;
+  connectButton.textContent = "Wallet connected";
+}
+
+connectButton.addEventListener("click", async () => {
+  const wallet = (window as Window & { ethereum?: InjectedWallet }).ethereum;
+  if (!wallet) {
+    walletStatus.textContent = "No browser wallet detected";
+    walletDetail.textContent = "Open this dashboard in MetaMask's browser or a browser with an injected EVM wallet.";
+    return;
+  }
+
+  connectButton.disabled = true;
+  walletStatus.textContent = "Waiting for wallet connection…";
+  try {
+    const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
+    const chainId = await wallet.request({ method: "eth_chainId" }) as string;
+    showWalletState(accounts?.[0] ?? null, chainId ?? null);
+
+    wallet.on?.("accountsChanged", (...args: unknown[]) => {
+      const nextAccounts = args[0] as string[];
+      void wallet.request({ method: "eth_chainId" }).then((nextChain) =>
+        showWalletState(nextAccounts?.[0] ?? null, String(nextChain ?? ""))
+      );
+    });
+    wallet.on?.("chainChanged", (...args: unknown[]) => {
+      const nextChain = String(args[0] ?? "");
+      void wallet.request({ method: "eth_accounts" }).then((currentAccounts) =>
+        showWalletState((currentAccounts as string[])?.[0] ?? null, nextChain)
+      );
+    });
+  } catch (error) {
+    walletStatus.textContent = "Wallet connection cancelled or unavailable";
+    walletDetail.textContent = error instanceof Error ? error.message : "The wallet did not complete the connection request.";
+  } finally {
+    connectButton.disabled = false;
+  }
+});
