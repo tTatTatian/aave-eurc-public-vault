@@ -1,8 +1,8 @@
 /**
  * Prepared Aave Simple Earn deployment parameters.
  *
- * Configuration only: no wallet connection, approvals, deployment or
- * transaction submission is performed by this module.
+ * Wallet connection is enabled through Reown AppKit. Approval is a separate,
+ * explicit wallet action; vault deployment remains disabled in the UI.
  *
  * Aave's documented SDK/API recipient split is applied to the manager-side
  * 50% of total fee revenue. A 100% split to this single owner recipient means
@@ -50,7 +50,7 @@ export const deploymentConfig = {
     additionalStrategiesEnabled: false
   },
   safety: {
-    walletConnectionEnabled: false,
+    walletConnectionEnabled: true,
     transactionSigningEnabled: false,
     transactionSubmissionEnabled: false,
     privateKeyHandling: false,
