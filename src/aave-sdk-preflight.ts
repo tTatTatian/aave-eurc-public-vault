@@ -133,6 +133,9 @@ async function runPreflight() {
     } else if (plan.__typename === "TransactionRequest") {
       planElement.textContent =
         "The SDK prepared a deployment transaction request without a separate approval step. The 1 EURC initial lock was accepted by the API for plan generation. Transaction data is intentionally not exposed or submitted by this preflight.";
+    } else if (plan.__typename === "InsufficientBalanceError") {
+      planElement.textContent =
+        `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No wallet was connected and no approval or transaction was submitted.`;
     } else {
       planElement.textContent =
         `The SDK returned plan type: ${plan.__typename}. No transaction was signed or submitted. Review the returned plan type before any future wallet integration.`;
