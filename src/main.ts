@@ -323,11 +323,52 @@ connectButton.addEventListener("click", async () => {
   walletStatus.textContent = "Waiting for wallet connection…";
   try {
     const accounts = await wallet.request({ method: "eth_requestAccounts" }) as string[];
-    const chainId = await wallet.request({ method: "eth_chainId" }) as string;
-    showWalletState(accounts?.[0] ?? null, chainId ?? null);
-    // Intentionally avoid provider event subscriptions here. Some embedded
-    // browser previews proxy the injected provider and violate Proxy invariants
-    // when its "on" property is accessed. Reconnect to refresh account/network.
+    const address = accounts?.[0] ?? null;
+    if (!address) throw new Error("The wallet did not return an account.");
+
+    let chainId = await wallet.request({ method: "eth_chainId" }) as string;
+
+    if (chainId?.toLowerCase() !== "0x2105" && Number(chainId) !== vaultConfig.chainId) {
+      walletStatus.textContent = "Switching wallet to Base Mainnet…";
+      walletDetail.textContent = "Please approve the network-switch request in your browser wallet.";
+
+      try {
+        await wallet.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }]
+        });
+      } catch (switchError) {
+        const errorCode = (switchError as { code?: number })?.code;
+        if (errorCode !== 4902) throw switchError;
+
+        await wallet.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: "0x2105",
+            chainName: "Base Mainnet",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://mainnet.base.org"],
+            blockExplorerUrls: ["https://basescan.org"]
+          }]
+        });
+
+        await wallet.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x2105" }]
+        });
+      }
+
+      chainId = await wallet.request({ method: "eth_chainId" }) as string;
+    }
+
+    if (chainId?.toLowerCase() !== "0x2105" && Number(chainId) !== vaultConfig.chainId) {
+      throw new Error(`Wallet is still on chain ${chainId ?? "unknown"}. Please select Base Mainnet and reconnect.`);
+    }
+
+    showWalletState(address, chainId);
+    walletDetail.textContent = "Connected to Base Mainnet (Chain ID 8453). No transaction or spending permissions requested.";
+    // Intentionally avoid provider event subscriptions because some embedded
+    // browser previews proxy the injected provider and violate Proxy invariants.
   } catch (error) {
     walletStatus.textContent = "Wallet connection failed";
     walletDetail.textContent = error instanceof Error ? error.message : "The wallet did not complete the connection request.";
