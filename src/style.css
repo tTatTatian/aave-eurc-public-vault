@@ -109,3 +109,10 @@ footer p { margin-bottom: 6px; }
 .wallet-connect strong { display: block; margin-bottom: 6px; overflow-wrap: anywhere; }
 .wallet-connect .muted { margin: 0; line-height: 1.5; }
 @media (max-width: 520px) { .wallet-connect { align-items: stretch; flex-direction: column; } .wallet-connect button { width: 100%; } }
+
+
+.wallet-actions { display: flex; flex-direction: column; gap: 8px; min-width: 170px; }
+.disconnect-button { border: 1px solid #526176; border-radius: 10px; padding: 9px 14px; color: #c8d5e5; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.disconnect-button:hover { background: #1a293b; }
+.disconnect-button[hidden] { display: none; }
+@media (max-width: 520px) { .wallet-actions { width: 100%; } }
