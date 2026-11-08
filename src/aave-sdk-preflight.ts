@@ -7,6 +7,25 @@ import {
 } from "@aave/client";
 import { reserve, vaultDeploy } from "@aave/client/actions";
 import { deploymentConfig } from "./deployment-config";
+import { createAppKit } from "@reown/appkit";
+import { EthersAdapter } from "@reown/appkit-adapter-ethers";
+import { base } from "@reown/appkit/networks";
+
+
+const REOWN_PROJECT_ID = "60d9055ba4eb686b42243c3e7ae27423";
+const reownAppKit = createAppKit({
+  adapters: [new EthersAdapter()],
+  networks: [base],
+  defaultNetwork: base,
+  projectId: REOWN_PROJECT_ID,
+  metadata: {
+    name: "Y.L. Aave EURC Public Vault",
+    description: "Aave V3 EURC vault deployment preflight on Base",
+    url: window.location.origin,
+    icons: []
+  },
+  features: { analytics: false }
+});
 
 const panel = document.getElementById("aave-sdk-preflight");
 
@@ -20,7 +39,7 @@ panel.innerHTML = `
       <div>
         <p class="eyebrow">OFFICIAL AAVE SDK · READ-ONLY PREFLIGHT</p>
         <h3>Simple Earn deployment check</h3>
-        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. This page connects MetaMask only when you explicitly tap Connect MetaMask. It can request the exact 1 EURC approval after a separate tap and MetaMask confirmation; vault deployment is never submitted here.</p>
+        <p class="muted">Checks the live EURC reserve and asks Aave's official API to prepare a deployment plan. Connect through Reown AppKit to choose MetaMask or another WalletConnect-compatible wallet. The app can request only the exact 1 EURC approval after your separate confirmation; vault deployment is never submitted here.</p>
       </div>
       <span class="sdk-status">Wallet connection optional</span>
     </div>
@@ -32,7 +51,7 @@ panel.innerHTML = `
     </div>
     <div class="sdk-action-row">
       <button id="run-aave-preflight" class="refresh-button" type="button">Run official Aave preflight</button>
-      <span id="sdk-result" class="sdk-result" role="status" aria-live="polite">Ready · no wallet or transaction functionality loaded</span>
+      <span id="sdk-result" class="sdk-result" role="status" aria-live="polite">Ready · connect with Reown AppKit when needed</span>
     </div>
     <div id="sdk-plan" class="sdk-plan" hidden></div>
   </div>
@@ -41,34 +60,53 @@ panel.innerHTML = `
 const resultElement = document.getElementById("sdk-result") as HTMLSpanElement;
 const planElement = document.getElementById("sdk-plan") as HTMLDivElement;
 const runButton = document.getElementById("run-aave-preflight") as HTMLButtonElement;
-let connectedWallet: string | null = null;
+let connectedWallet: string | null = reownAppKit.getAddress() ?? null;
+let connectedChainId: number | null = reownAppKit.getChainId() ?? null;
+let walletProvider: any = reownAppKit.getWalletProvider();
+let walletConnected = reownAppKit.getIsConnected();
 const EURC_TOKEN = deploymentConfig.asset.address.toLowerCase();
 const FACTORY_SPENDER = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
 const EXACT_ALLOWANCE = 1_000_000n;
 
-async function connectMetaMask(): Promise<string> {
-  const ethereum = (window as any).ethereum;
-  if (!ethereum?.request) throw new Error("MetaMask provider not found. Open this project in MetaMask's browser.");
-  const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
-  const chain = String(await ethereum.request({ method: "eth_chainId" })).toLowerCase();
-  if (chain !== "0x2105") throw new Error("Switch MetaMask to Base Mainnet (chain ID 8453).");
-  const account = accounts?.[0];
-  if (!account || account.toLowerCase() !== deploymentConfig.deployer.toLowerCase()) {
-    throw new Error("Connected account does not match the configured deployer.");
+function updateWalletApprovalUi() {
+  const status = document.getElementById("wallet-approval-status") as HTMLSpanElement | null;
+  const approveButton = document.getElementById("approve-exact-eurc") as HTMLButtonElement | null;
+  if (!status || !approveButton) return;
+  const addressMatches = connectedWallet?.toLowerCase() === deploymentConfig.deployer.toLowerCase();
+  const chainMatches = Number(connectedChainId) === 8453;
+  const ready = Boolean(walletConnected && walletProvider && addressMatches && chainMatches);
+  approveButton.disabled = !ready;
+  if (!walletConnected) {
+    status.textContent = "No wallet connected · use Connect Wallet.";
+  } else if (!addressMatches) {
+    status.textContent = "Wrong account · connect the configured deployer wallet.";
+  } else if (!chainMatches) {
+    status.textContent = "Wrong network · select Base Mainnet (8453).";
+  } else {
+    status.textContent = "Connected: " + connectedWallet + " · Base Mainnet";
   }
-  connectedWallet = account;
-  return account;
 }
 
+reownAppKit.subscribeProvider((state: any) => {
+  walletProvider = state.provider ?? null;
+  connectedWallet = state.address ?? null;
+  connectedChainId = state.chainId == null ? null : Number(state.chainId);
+  walletConnected = Boolean(state.isConnected);
+  updateWalletApprovalUi();
+});
+
 async function submitExactApproval(approval: any): Promise<string> {
-  const ethereum = (window as any).ethereum;
-  if (!ethereum?.request || !connectedWallet) throw new Error("Connect the configured MetaMask wallet first.");
-  const chain = String(await ethereum.request({ method: "eth_chainId" })).toLowerCase();
-  const accounts = await ethereum.request({ method: "eth_accounts" }) as string[];
+  const provider = walletProvider;
+  if (!provider?.request || !walletConnected || !connectedWallet) {
+    throw new Error("Connect your wallet through Reown AppKit first.");
+  }
+  const chain = String(await provider.request({ method: "eth_chainId" })).toLowerCase();
+  const accounts = await provider.request({ method: "eth_accounts" }) as string[];
   const data = String(approval.data ?? "");
   const match = /^0x095ea7b3([0-9a-fA-F]{64})([0-9a-fA-F]{64})$/i.exec(data);
   if (chain !== "0x2105" ||
       accounts?.[0]?.toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
+      connectedWallet.toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
       String(approval.from).toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
       String(approval.to).toLowerCase() !== EURC_TOKEN ||
       approvalSpender(data)?.toLowerCase() !== FACTORY_SPENDER ||
@@ -77,7 +115,7 @@ async function submitExactApproval(approval: any): Promise<string> {
       BigInt(String(approval.value ?? 0)) !== 0n) {
     throw new Error("Approval did not match the exact reviewed Base EURC, factory, sender and 1-EURC parameters. Nothing was sent.");
   }
-  return await ethereum.request({
+  return await provider.request({
     method: "eth_sendTransaction",
     params: [{ from: connectedWallet, to: approval.to, data, value: "0x0" }]
   }) as string;
@@ -269,13 +307,13 @@ function showPlanDetails(plan: any) {
       : "Could not safely decode the spender from the approval calldata";
     planElement.innerHTML = `
       <div class="sdk-plan-intro">
-        <strong>Approval required · MetaMask connection available</strong>
+        <strong>Approval required · Reown AppKit connection available</strong>
         <p>${escapeHtml(plan.reason)}</p>
-        <p>Connect the configured wallet, then request only the exact 1 EURC approval. This control never submits the vault deployment.</p>
+        <p>Connect using the wallet selector (MetaMask or WalletConnect), then request only the exact 1 EURC approval. This control never submits the vault deployment.</p>
         <div class="sdk-action-row">
-          <button id="connect-metamask" class="refresh-button" type="button">Connect MetaMask</button>
+          <button id="connect-wallet" class="refresh-button" type="button">Connect Wallet</button>
           <button id="approve-exact-eurc" class="refresh-button" type="button" disabled>Approve exactly 1 EURC</button>
-          <span id="wallet-approval-status" class="sdk-result" role="status" aria-live="polite">Wallet not connected</span>
+          <span id="wallet-approval-status" class="sdk-result" role="status" aria-live="polite">No wallet connected</span>
         </div>
       </div>
       <section class="sdk-detail-card">
@@ -293,21 +331,12 @@ function showPlanDetails(plan: any) {
       ${showDecodedDeployment(String(plan.originalTransaction.data ?? ""))}
       <p class="sdk-review-warning">Safety check: only the exact 1 EURC approval is enabled here. The deployment transaction remains review-only and cannot be submitted by this button.</p>
     `;
-    const connectButton = document.getElementById("connect-metamask") as HTMLButtonElement;
+    const connectButton = document.getElementById("connect-wallet") as HTMLButtonElement;
     const approveButton = document.getElementById("approve-exact-eurc") as HTMLButtonElement;
-    const walletStatus = document.getElementById("wallet-approval-status") as HTMLSpanElement;
-    connectButton.addEventListener("click", async () => {
-      connectButton.disabled = true;
-      try {
-        const account = await connectMetaMask();
-        walletStatus.textContent = "Connected: " + account;
-        approveButton.disabled = false;
-      } catch (error) {
-        walletStatus.textContent = error instanceof Error ? error.message : "Connection failed.";
-      } finally {
-        connectButton.disabled = false;
-      }
+    connectButton.addEventListener("click", () => {
+      reownAppKit.open({ view: "Connect", namespace: "eip155" });
     });
+    updateWalletApprovalUi();
     approveButton.addEventListener("click", async () => {
       approveButton.disabled = true;
       walletStatus.textContent = "Check the transaction details in MetaMask…";
@@ -353,11 +382,10 @@ async function runPreflight() {
 
     if (
       deploymentConfig.owner.toLowerCase() !== deploymentConfig.deployer.toLowerCase() ||
-      deploymentConfig.safety.walletConnectionEnabled ||
       deploymentConfig.safety.transactionSigningEnabled ||
       deploymentConfig.safety.transactionSubmissionEnabled
     ) {
-      throw new Error("Safety/configuration guard failed. No deployment plan was requested.");
+      throw new Error("Signing/submission safety guard failed. No deployment plan was requested.");
     }
 
     const reserveResult = await reserve(client, {
