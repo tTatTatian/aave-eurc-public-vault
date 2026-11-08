@@ -397,9 +397,42 @@ function showPlanDetails(plan: any) {
   });
 
   } else if (plan.__typename === "TransactionRequest") {
+    const factoryAddress = "0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70";
+    const deploymentData = String(plan.data ?? "");
+    const deploymentSelector = /^0x[0-9a-fA-F]{8}/.test(deploymentData)
+      ? deploymentData.slice(0, 10).toLowerCase()
+      : "";
+    const deploymentChecks: [string, boolean][] = [
+      ["Destination is the configured Aave vault factory", String(plan.to).toLowerCase() === factoryAddress],
+      ["Sender is the configured deployer", String(plan.from).toLowerCase() === deploymentConfig.deployer.toLowerCase()],
+      ["Network is Base Mainnet (8453)", Number(plan.chainId) === 8453],
+      ["Native ETH value is zero", BigInt(String(plan.value ?? 0)) === 0n],
+      ["Function selector is ATokenVaultFactory.deployVault", deploymentSelector === DEPLOY_VAULT_SELECTOR]
+    ];
+    const deploymentChecksPassed = deploymentChecks.every(([, passed]) => passed);
+    const deploymentCheckRows = deploymentChecks.map(([label, passed]) =>
+      '<div class="sdk-config-check"><span class="' + (passed ? "pass" : "fail") + '">' +
+      (passed ? "PASS" : "MISMATCH") + '</span><span>' + escapeHtml(label) + '</span></div>'
+    ).join("");
+    let decodedDeploymentHtml = "";
+    try {
+      decodedDeploymentHtml = showDecodedDeployment(deploymentData);
+    } catch (error) {
+      decodedDeploymentHtml =
+        '<section class="sdk-detail-card"><h4>Decoded vault deployment configuration</h4>' +
+        '<p class="sdk-decode-status fail">Calldata could not be decoded safely — do not proceed.</p>' +
+        '<p>' + escapeHtml(error instanceof Error ? error.message : "Unknown calldata decoding error.") + '</p></section>';
+    }
     planElement.innerHTML = `
-      <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. Review the destination and sender before any wallet action.</p></div>
+      <div class="sdk-plan-intro"><strong>Deployment transaction prepared · not sent</strong><p>The SDK returned a single transaction request. The complete calldata is decoded below for inspection. This remains read-only: no deployment transaction is submitted.</p></div>
+      <section class="sdk-detail-card">
+        <h4>Deployment transaction safety checks</h4>
+        <p class="sdk-decode-status ${deploymentChecksPassed ? "pass" : "fail"}">${deploymentChecksPassed ? "Transaction envelope checks passed" : "Transaction envelope mismatch — do not proceed"}</p>
+        <div class="sdk-config-checks">${deploymentCheckRows}</div>
+      </section>
       ${transactionSummary("Vault deployment transaction (not sent)", plan)}
+      ${decodedDeploymentHtml}
+      <p class="sdk-review-warning">Read-only review only. This panel does not request wallet access, sign, or submit the deployment. The API-added Safe address is displayed as an address; its identity must be independently verified before deployment.</p>
     `;
   } else if (plan.__typename === "InsufficientBalanceError") {
     planElement.textContent =
