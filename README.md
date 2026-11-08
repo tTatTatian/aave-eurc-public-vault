@@ -87,9 +87,11 @@ Still required:
 ## Local development
 
 ```bash
-npm install
+npm install @aave/react@latest react react-dom
 npm run dev
 ```
+
+The SDK install command adds the official Aave React SDK and its React runtime. Keep the generated `package-lock.json` committed so the resolved SDK version is pinned for reproducible installs.
 
 Run the configuration tests and validation checks:
 
