@@ -14,6 +14,9 @@ declare global {
 const VAULT = "0x56E70807df5e23eB628327c788De38C8f8dF95Bc";
 const EURC = vaultConfig.asset.address;
 const OWNER_CONFIG = vaultConfig.owner;
+const SPLITTER = "0xe8A7b07B64AE3911d717D9b60ACD84560fFc60C9";
+const A_TOKEN = vaultConfig.aaveV3.aToken;
+const AAVE_LABS_SAFE = "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba";
 const DECIMALS = vaultConfig.asset.decimals;
 
 const vaultAbi = [
@@ -33,6 +36,14 @@ const vaultAbi = [
   "function deposit(uint256,address) returns (uint256)",
   "function redeem(uint256,address,address) returns (uint256)",
   "function withdrawFees(address,uint256)"
+] as const;
+
+const splitterAbi = [
+  "function owner() view returns (address)",
+  "function VAULT() view returns (address)",
+  "function withdrawFees()",
+  "function splitRevenue(address[] assets)",
+  "function getRecipients() view returns (tuple(address addr,uint16 shareInBps)[])"
 ] as const;
 
 const erc20Abi = [
@@ -88,12 +99,13 @@ panel.innerHTML = `
 
       <section class="vault-action-card vault-fee-card">
         <p class="eyebrow">VAULT MANAGER ONLY</p>
-        <h4>Claim performance fees</h4>
-        <p class="muted">Claimable fees are paid in the Aave EURC aToken (aEURC), not in underlying EURC.</p>
-        <div class="fee-amount"><strong id="va-claimable-fees">—</strong><span>aEURC claimable</span></div>
-        <p class="muted" id="va-fee-owner">Checking on-chain owner…</p>
-        <button id="va-claim-fees" class="refresh-button" type="button" disabled>Claim fees to owner wallet</button>
-        <p id="va-claim-status" class="action-status" role="status" aria-live="polite">Fee claim requires the on-chain vault owner.</p>
+        <h4>Claim and distribute fees</h4>
+        <p class="muted">Collect accrued fees into the revenue splitter, then distribute its aEURC balance according to the on-chain recipient configuration.</p>
+        <div class="fee-amount"><strong id="va-claimable-fees">—</strong><span>aEURC currently claimable in vault</span></div>
+        <p class="muted" id="va-fee-owner">Checking splitter owner and recipients…</p>
+        <p class="muted" id="va-splitter-balance">Splitter balance: checking…</p>
+        <button id="va-claim-fees" class="refresh-button" type="button" disabled>Collect and distribute fees</button>
+        <p id="va-claim-status" class="action-status" role="status" aria-live="polite">Requires the revenue-splitter owner. Two separate wallet confirmations.</p>
       </section>
     </div>
     <p class="vault-disclaimer">Contract: <code>${VAULT}</code>. Network: Base Mainnet (8453). Check the amount, recipient and network in your wallet before confirming. The initial locked share belongs to the vault and is not part of your personal balance.</p>
@@ -170,20 +182,31 @@ async function refreshVault() {
     }
     setText("va-total-assets", format(totalAssets));
     setText("va-claimable-fees", format(claimableRaw));
-    setText("va-fee-owner", `On-chain owner: ${onchainOwner} · Fee: ${(Number(feeRaw) / 1e16).toFixed(2)}%`);
+    const splitter = new Contract(SPLITTER, splitterAbi, browser);
+    const token = new Contract(A_TOKEN, erc20Abi, browser);
+    const [splitterOwner, splitterVault, recipients, splitterBalance] = await Promise.all([
+      splitter.owner() as Promise<string>,
+      splitter.VAULT() as Promise<string>,
+      splitter.getRecipients() as Promise<Array<{ addr: string; shareInBps: bigint }>>,
+      token.balanceOf(SPLITTER) as Promise<bigint>
+    ]);
+    if (onchainOwner.toLowerCase() !== SPLITTER.toLowerCase() || splitterVault.toLowerCase() !== VAULT.toLowerCase()) {
+      throw new Error("Vault/splitter linkage does not match the configured deployed contracts. Fee actions blocked.");
+    }
+    const recipientSummary = recipients.map((r) => `${r.addr} (${Number(r.shareInBps) / 100}%)`).join(" · ");
+    setText("va-fee-owner", `Splitter owner: ${splitterOwner} · Fee: ${(Number(feeRaw) / 1e16).toFixed(2)}% · Recipients: ${recipientSummary}`);
+    setText("va-splitter-balance", `Splitter aEURC balance: ${format(splitterBalance)}`);
     const claimButton = byId<HTMLButtonElement>("va-claim-fees");
-    const isOwner = !!connectedAccount &&
-      connectedAccount.toLowerCase() === onchainOwner.toLowerCase() &&
-      onchainOwner.toLowerCase() === OWNER_CONFIG.toLowerCase();
-    claimButton.disabled = !isOwner || claimableRaw === 0n;
+    const isOwner = !!connectedAccount && connectedAccount.toLowerCase() === splitterOwner.toLowerCase() && splitterOwner.toLowerCase() === OWNER_CONFIG.toLowerCase();
+    claimButton.disabled = !isOwner || (claimableRaw === 0n && splitterBalance === 0n);
     if (claimableRaw === 0n) {
       setStatus("va-claim-status", "No performance fees are currently claimable.");
-    } else if (onchainOwner.toLowerCase() !== OWNER_CONFIG.toLowerCase()) {
+    } else if (splitterOwner.toLowerCase() !== OWNER_CONFIG.toLowerCase()) {
       setStatus("va-claim-status", "Fee claim blocked: the contract owner differs from the configured owner. This must be reconciled before claiming.");
     } else if (!isOwner) {
       setStatus("va-claim-status", "Fee claim locked: connect the exact on-chain owner wallet. The page will not attempt a claim from another address.");
     } else {
-      setStatus("va-claim-status", "Owner verified. You can claim the currently accrued aEURC fees.");
+      setStatus("va-claim-status", "Splitter owner verified. Collection and distribution require two separate wallet confirmations.");
     }
 
     if (connectedAccount) {
@@ -323,30 +346,47 @@ byId<HTMLButtonElement>("va-claim-fees").addEventListener("click", async () => {
   const button = byId<HTMLButtonElement>("va-claim-fees");
   button.disabled = true;
   try {
-    setStatus("va-claim-status", "Verifying owner and current claimable fees…");
-    const { account, signer } = await requireWallet();
-    const vault = new Contract(VAULT, vaultAbi, signer);
-    const [onchainOwner, amount, freshFee] = await Promise.all([
-      vault.owner() as Promise<string>,
+    setStatus("va-claim-status", "Checking Base network, splitter ownership, vault linkage and recipients…");
+    const { account, signer, browser } = await requireWallet();
+    const vault = new Contract(VAULT, vaultAbi, browser);
+    const splitter = new Contract(SPLITTER, splitterAbi, signer);
+    const token = new Contract(A_TOKEN, erc20Abi, browser);
+    const [vaultOwner, splitterOwner, splitterVault, claimable, recipients, beforeSplitterBalance, beforeWalletBalance] = await Promise.all([
+      vault.owner() as Promise<string>, splitter.owner() as Promise<string>, splitter.VAULT() as Promise<string>,
       vault.getClaimableFees() as Promise<bigint>,
-      vault.getFee() as Promise<bigint>
+      splitter.getRecipients() as Promise<Array<{ addr: string; shareInBps: bigint }>>,
+      token.balanceOf(SPLITTER) as Promise<bigint>, token.balanceOf(account) as Promise<bigint>
     ]);
-    if (account.toLowerCase() !== onchainOwner.toLowerCase()) {
-      throw new Error(`Connected wallet is not the on-chain owner (${onchainOwner}). Fee claim blocked.`);
+    if (vaultOwner.toLowerCase() !== SPLITTER.toLowerCase() || splitterVault.toLowerCase() !== VAULT.toLowerCase()) throw new Error("Vault/splitter linkage mismatch. No transaction sent.");
+    if (splitterOwner.toLowerCase() !== OWNER_CONFIG.toLowerCase() || account.toLowerCase() !== splitterOwner.toLowerCase()) throw new Error(`Connected wallet must be configured splitter owner ${splitterOwner}. No transaction sent.`);
+    if (!recipients.length || recipients.reduce((sum, item) => sum + Number(item.shareInBps), 0) !== 10_000) throw new Error("Recipient shares do not total 10,000 basis points. No transaction sent.");
+    const ownerRecipient = recipients.find((r) => r.addr.toLowerCase() === OWNER_CONFIG.toLowerCase());
+    const safeRecipient = recipients.find((r) => r.addr.toLowerCase() === AAVE_LABS_SAFE.toLowerCase());
+    if (!ownerRecipient || !safeRecipient || Number(ownerRecipient.shareInBps) !== 5_000 || Number(safeRecipient.shareInBps) !== 5_000) throw new Error("Expected 50/50 owner and Aave Labs Safe recipients not verified. No transaction sent.");
+    if (claimable === 0n && beforeSplitterBalance === 0n) throw new Error("No claimable fees or previously collected aEURC are available.");
+
+    let collectHash = "not needed";
+    if (claimable > 0n) {
+      setStatus("va-claim-status", `Ready to collect ${format(claimable)} aEURC. Confirm transaction 1 of 2 in your wallet.`);
+      const collectTx = await splitter.withdrawFees();
+      collectHash = collectTx.hash;
+      setStatus("va-claim-status", `Collection submitted: ${collectHash}. Waiting for confirmation…`);
+      const receipt = await collectTx.wait();
+      if (!receipt || receipt.status !== 1) throw new Error("Fee collection did not confirm successfully.");
     }
-    if (onchainOwner.toLowerCase() !== OWNER_CONFIG.toLowerCase()) {
-      throw new Error("On-chain owner does not match the configured owner wallet. Fee claim blocked pending owner reconciliation.");
-    }
-    if (amount === 0n) throw new Error("There are no claimable fees.");
-    if (freshFee > 10n ** 18n) throw new Error("Unexpected fee value; claim blocked.");
-    setStatus("va-claim-status", `Claiming ${format(amount)} aEURC to the verified owner wallet. Review the transaction in your browser wallet.`);
-    const tx = await vault.withdrawFees(account, amount);
-    setStatus("va-claim-status", `Fee claim submitted: ${tx.hash}. Waiting for confirmation…`);
-    await tx.wait();
-    setStatus("va-claim-status", "Fee claim confirmed. aEURC was sent to the owner wallet.");
-    await refreshVault();
+    const distributable = await token.balanceOf(SPLITTER) as bigint;
+    if (distributable <= 0n) throw new Error("Splitter has no aEURC to distribute. No distribution transaction sent.");
+    setStatus("va-claim-status", `Splitter holds ${format(distributable)} aEURC. Simulating distribution…`);
+    await splitter.splitRevenue.staticCall([A_TOKEN]);
+    setStatus("va-claim-status", "Distribution simulation succeeded. Confirm transaction 2 of 2 in your wallet.");
+    const splitTx = await splitter.splitRevenue([A_TOKEN]);
+    setStatus("va-claim-status", `Distribution submitted: ${splitTx.hash}. Waiting for confirmation…`);
+    const splitReceipt = await splitTx.wait();
+    if (!splitReceipt || splitReceipt.status !== 1) throw new Error("Distribution did not confirm successfully.");
+    const [afterWalletBalance, afterSplitterBalance] = await Promise.all([token.balanceOf(account), token.balanceOf(SPLITTER)]);
+    setStatus("va-claim-status", `Complete. Your wallet received ${format(afterWalletBalance - beforeWalletBalance)} aEURC. Splitter remainder: ${format(afterSplitterBalance)}. Collection: ${collectHash}. Distribution: ${splitTx.hash}`);
   } catch (error) {
-    setStatus("va-claim-status", error instanceof Error ? error.message : "Fee claim was not completed.");
+    setStatus("va-claim-status", error instanceof Error ? error.message : "Fee collection/distribution was not completed.");
   } finally {
     button.disabled = false;
     await refreshVault();
