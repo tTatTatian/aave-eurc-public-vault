@@ -280,7 +280,7 @@ function showDecodedDeployment(data: string): string {
     '<div><dt>Share token symbol</dt><dd>' + escapeHtml(decoded.shareSymbol) + '</dd></div></dl>' +
     '<h4 class="sdk-recipient-heading">Fee recipients encoded by Aave API</h4>' +
     '<ul class="sdk-recipient-list">' + (recipientRows || "<li>No recipients encoded</li>") + '</ul>' +
-    '<p class="sdk-review-warning">The Aave API encodes the configured owner wallet and Aave Labs fee-recipient Safe as the two recipients, 50% each. The second address is treated as Aave Labs' fee recipient, not as an additional partner. Both addresses and their exact 50/50 split are checked against the reviewed deployment configuration.</p></section>';
+    '<p class="sdk-review-warning">The Aave API encodes the configured owner wallet and the Aave Labs fee-recipient Safe as the two recipients, 50% each of the displayed manager-side allocation. The second address is treated as Aave Labs fee recipient, not as an additional partner. Both addresses and their exact 50/50 split are checked against the reviewed deployment configuration.</p></section>';
 }
 
 function showPlanDetails(plan: any) {
