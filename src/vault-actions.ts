@@ -18,6 +18,7 @@ const DECIMALS = vaultConfig.asset.decimals;
 
 const vaultAbi = [
   "function asset() view returns (address)",
+  "function ATOKEN() view returns (address)",
   "function owner() view returns (address)",
   "function totalAssets() view returns (uint256)",
   "function totalSupply() view returns (uint256)",
@@ -151,7 +152,7 @@ function readContracts() {
 async function refreshVault() {
   try {
     const { vault, eurc } = readContracts();
-    const [totalAssets, feeRaw, claimableRaw, onchainOwner, assetAddress] = await Promise.all([
+    const [totalAssets, feeRaw, claimableRaw, onchainOwner, assetAddress, aTokenAddress] = await Promise.all([
       vault.totalAssets() as Promise<bigint>,
       vault.getFee() as Promise<bigint>,
       vault.getClaimableFees() as Promise<bigint>,
