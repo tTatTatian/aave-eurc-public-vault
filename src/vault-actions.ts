@@ -150,7 +150,7 @@ function readContracts() {
 
 async function refreshVault() {
   try {
-    const { browser, vault, eurc } = readContracts();
+    const { vault, eurc } = readContracts();
     const [totalAssets, totalSupply, feeRaw, claimableRaw, onchainOwner, assetAddress] = await Promise.all([
       vault.totalAssets() as Promise<bigint>,
       vault.totalSupply() as Promise<bigint>,
