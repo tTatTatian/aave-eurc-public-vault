@@ -165,7 +165,7 @@ async function refreshVault() {
     setText("va-claimable-fees", format(claimableRaw));
     setText("va-fee-owner", `On-chain owner: ${onchainOwner} · Fee: ${(Number(feeRaw) / 1e16).toFixed(2)}%`);
     const claimButton = byId<HTMLButtonElement>("va-claim-fees");
-    const isOwner = !!connectedAccount && connectedAccount.toLowerCase() === onchainOwner.toLowerCase();
+    const isOwner = !!connectedAccount &&\n      connectedAccount.toLowerCase() === onchainOwner.toLowerCase() &&\n      onchainOwner.toLowerCase() === OWNER_CONFIG.toLowerCase();
     claimButton.disabled = !isOwner || claimableRaw === 0n;
     if (claimableRaw === 0n) {
       setStatus("va-claim-status", "No performance fees are currently claimable.");
