@@ -228,12 +228,14 @@ function decodeVaultDeployment(data: string) {
 function showDecodedDeployment(data: string): string {
   const decoded = decodeVaultDeployment(data);
   const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
-  // No custom recipients are supplied to Aave's SDK. Per Aave's deployment
-  // documentation, the default is 50% of total fee revenue to the owner and
-  // 50% to Aave Labs. The encoded manager-side recipient is the owner at 100%;
-  // Aave Labs' automatic 50% is handled by Aave.
+  // The Aave API encodes the owner and Aave Labs' verified fee-recipient Safe
+  // directly in this deployment calldata, at 50% each. Treat these as the
+  // complete intended split for this deployment; do not add another automatic
+  // 50% on top of this encoded two-recipient allocation.
+  const aaveLabsRecipient = "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba";
   const expectedRecipients = [
-    { address: deploymentConfig.owner.toLowerCase(), shareInBps: 10_000 }
+    { address: deploymentConfig.owner.toLowerCase(), shareInBps: 5_000 },
+    { address: aaveLabsRecipient, shareInBps: 5_000 }
   ];
   const actualRecipients = decoded.recipients
     .map(({ address, shareInBps }) => ({ address: address.toLowerCase(), shareInBps }))
@@ -248,7 +250,7 @@ function showDecodedDeployment(data: string): string {
     ["Share token name", decoded.shareName === deploymentConfig.vaultName],
     ["Share token symbol", decoded.shareSymbol === deploymentConfig.shareTokenSymbol],
     ["Initial lock deposit", decoded.initialLockDeposit === deploymentConfig.initialLockDeposit.rawAmount],
-    ["Fee recipient list (owner 100% of manager-side allocation; Aave Labs automatic 50%)",
+    ["Fee recipient list (owner 50% + Aave Labs 50%)",
       actualRecipients.length === sortedExpectedRecipients.length &&
       actualRecipients.every((recipient, i) =>
         recipient.address === sortedExpectedRecipients[i].address &&
@@ -278,7 +280,7 @@ function showDecodedDeployment(data: string): string {
     '<div><dt>Share token symbol</dt><dd>' + escapeHtml(decoded.shareSymbol) + '</dd></div></dl>' +
     '<h4 class="sdk-recipient-heading">Fee recipients encoded by Aave API</h4>' +
     '<ul class="sdk-recipient-list">' + (recipientRows || "<li>No recipients encoded</li>") + '</ul>' +
-    '<p class="sdk-review-warning">Aave Labs receives its documented automatic 50% of total performance-fee revenue. The owner is the sole encoded manager-side recipient and receives the remaining 50%. No custom Safe or partner recipient is configured. The decoded calldata is checked against this exact default arrangement.</p></section>';
+    '<p class="sdk-review-warning">The Aave API encodes the configured owner wallet and Aave Labs fee-recipient Safe as the two recipients, 50% each. The second address is treated as Aave Labs' fee recipient, not as an additional partner. Both addresses and their exact 50/50 split are checked against the reviewed deployment configuration.</p></section>';
 }
 
 function showPlanDetails(plan: any) {
@@ -462,7 +464,7 @@ function showPlanDetails(plan: any) {
       ${decodedDeploymentHtml}
       <section class="sdk-detail-card">
         <h4>Deploy vault through your browser wallet</h4>
-        <p>Expected fee split: 50% of total performance-fee revenue to your owner wallet and 50% automatically to Aave Labs. No separate Safe or partner recipient is configured.</p>
+        <p>Expected fee split: 50% to your owner wallet and 50% to Aave Labs' fee-recipient Safe. No separate partner recipient is configured.</p>
         <p>Pressing this button requests the exact Aave SDK deployment transaction in browser wallet. Nothing is sent unless you review and confirm it in your wallet.</p>
         <button id="submit-vault-deployment" class="refresh-button" type="button" ${deploymentChecksPassed ? "" : "disabled"}>Deploy vault · review in your browser wallet</button>
         <p id="deployment-submit-status" class="sdk-result" role="status" aria-live="polite">Deployment not submitted.</p>
@@ -493,7 +495,8 @@ function showPlanDetails(plan: any) {
           const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
           const recipients = decoded.recipients.map(x => ({ address: x.address.toLowerCase(), shareInBps: x.shareInBps })).sort((a,b) => a.address.localeCompare(b.address));
           const expectedRecipients = [
-            { address: deploymentConfig.owner.toLowerCase(), shareInBps: 10_000 }
+            { address: deploymentConfig.owner.toLowerCase(), shareInBps: 5_000 },
+            { address: "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba", shareInBps: 5_000 }
           ].sort((a,b) => a.address.localeCompare(b.address));
           const configMatches =
             decoded.underlying.toLowerCase() === deploymentConfig.asset.address.toLowerCase() &&
