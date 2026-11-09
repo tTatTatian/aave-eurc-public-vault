@@ -459,8 +459,74 @@ function showPlanDetails(plan: any) {
       </section>
       ${transactionSummary("Vault deployment transaction (not sent)", plan)}
       ${decodedDeploymentHtml}
-      <p class="sdk-review-warning">Read-only review only. This panel does not request wallet access, sign, or submit the deployment. The API-added Safe address is displayed as an address; its identity must be independently verified before deployment.</p>
-    `;
+      <section class="sdk-detail-card">
+        <h4>Deploy vault through MetaMask</h4>
+        <p>The configured API-added Safe recipient and 50/50 fee split have been reviewed and accepted by the vault owner. The address is still shown transparently in the decoded configuration above.</p>
+        <p>Pressing this button requests the exact Aave SDK deployment transaction in MetaMask. Nothing is sent unless you review and confirm it in your wallet.</p>
+        <button id="submit-vault-deployment" class="refresh-button" type="button" ${deploymentChecksPassed ? "" : "disabled"}>Deploy vault · review in MetaMask</button>
+        <p id="deployment-submit-status" class="sdk-result" role="status" aria-live="polite">Deployment not submitted.</p>
+      </section>
+    
+      const deployButton = document.getElementById("submit-vault-deployment") as HTMLButtonElement | null;
+      const deployStatus = document.getElementById("deployment-submit-status") as HTMLParagraphElement | null;
+      deployButton?.addEventListener("click", async () => {
+        if (!deployButton || !deployStatus) return;
+        deployButton.disabled = true;
+        deployStatus.textContent = "Rechecking wallet, allowance and deployment calldata…";
+        try {
+          const ethereum = (window as Window & { ethereum?: { request(args: { method: string; params?: unknown[] }): Promise<unknown> } }).ethereum;
+          if (!ethereum) throw new Error("No injected wallet found. Open this page in your wallet-enabled browser.");
+          const accounts = await ethereum.request({ method: "eth_accounts" }) as string[];
+          const account = accounts?.[0];
+          if (!account || account.toLowerCase() !== deploymentConfig.deployer.toLowerCase()) {
+            throw new Error("Connected wallet does not match the configured vault owner/deployer.");
+          }
+          const activeChain = String(await ethereum.request({ method: "eth_chainId" }));
+          if (activeChain.toLowerCase() !== "0x2105" && Number(activeChain) !== 8453) {
+            throw new Error("Wallet is not connected to Base Mainnet (8453).");
+          }
+          if (!deploymentChecksPassed) throw new Error("Deployment transaction envelope checks failed.");
+          const decoded = decodeVaultDeployment(deploymentData);
+          const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
+          const expectedSafe = "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba";
+          const recipients = decoded.recipients.map(x => ({ address: x.address.toLowerCase(), shareInBps: x.shareInBps })).sort((a,b) => a.address.localeCompare(b.address));
+          const expectedRecipients = [
+            { address: deploymentConfig.owner.toLowerCase(), shareInBps: 5000 },
+            { address: expectedSafe, shareInBps: 5000 }
+          ].sort((a,b) => a.address.localeCompare(b.address));
+          const configMatches =
+            decoded.underlying.toLowerCase() === deploymentConfig.asset.address.toLowerCase() &&
+            decoded.poolAddressesProvider.toLowerCase() === BASE_POOL_ADDRESSES_PROVIDER &&
+            decoded.owner.toLowerCase() === deploymentConfig.owner.toLowerCase() &&
+            decoded.initialFee === expectedFee &&
+            decoded.shareName === deploymentConfig.vaultName &&
+            decoded.shareSymbol === deploymentConfig.shareTokenSymbol &&
+            decoded.initialLockDeposit === deploymentConfig.initialLockDeposit.rawAmount &&
+            recipients.length === expectedRecipients.length &&
+            recipients.every((x,i) => x.address === expectedRecipients[i].address && x.shareInBps === expectedRecipients[i].shareInBps);
+          if (!configMatches) throw new Error("Decoded deployment configuration changed or no longer matches the reviewed settings.");
+          const latestAllowance = await readEurcFactoryAllowance(account);
+          if (latestAllowance < deploymentConfig.initialLockDeposit.rawAmount) {
+            throw new Error("Factory allowance is now below 1 EURC. Deployment blocked.");
+          }
+          deployStatus.textContent = "MetaMask will now show the deployment transaction. Check every detail before confirming.";
+          const txValue = BigInt(String(plan.value ?? 0));
+          const txHash = await ethereum.request({
+            method: "eth_sendTransaction",
+            params: [{
+              from: account,
+              to: String(plan.to),
+              data: deploymentData,
+              value: "0x" + txValue.toString(16)
+            }]
+          }) as string;
+          deployStatus.textContent = "Wallet submitted the deployment transaction: " + txHash + ". Wait for confirmation before treating the vault as deployed.";
+        } catch (error) {
+          deployStatus.textContent = error instanceof Error ? error.message : "Deployment was not submitted.";
+          deployButton.disabled = false;
+        }
+      });
+`;
   } else if (plan.__typename === "InsufficientBalanceError") {
     planElement.textContent =
       `Aave accepted the deployment request but reports insufficient EURC in the deployer wallet. Available: ${plan.available.value} EURC; required: ${plan.required.value} EURC. The initial lock deposit is permanently locked. No approval or transaction was submitted.`;
