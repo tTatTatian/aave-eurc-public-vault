@@ -125,6 +125,16 @@ const setText = (id: string, value: string) => { byId<HTMLElement>(id).textConte
 const setStatus = (id: string, value: string) => setText(id, value);
 const inputValue = (id: string) => byId<HTMLInputElement>(id).value.trim();
 
+document.querySelectorAll<HTMLButtonElement>("[data-deposit-preset]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const amount = button.dataset.depositPreset;
+    if (!amount) return;
+    const input = byId<HTMLInputElement>("va-deposit-amount");
+    input.value = amount;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+});
+
 let connectedAccount: string | null = null;
 
 function format(raw: bigint): string {
