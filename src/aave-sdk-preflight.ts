@@ -462,10 +462,10 @@ function showPlanDetails(plan: any) {
       ${transactionSummary("Vault deployment transaction (not sent)", plan)}
       ${decodedDeploymentHtml}
       <section class="sdk-detail-card">
-        <h4>Deploy vault through MetaMask</h4>
+        <h4>Deploy vault through your browser wallet</h4>
         <p>The configured API-added Safe recipient and 50/50 fee split have been reviewed and accepted by the vault owner. The address is still shown transparently in the decoded configuration above.</p>
-        <p>Pressing this button requests the exact Aave SDK deployment transaction in MetaMask. Nothing is sent unless you review and confirm it in your wallet.</p>
-        <button id="submit-vault-deployment" class="refresh-button" type="button" ${deploymentChecksPassed ? "" : "disabled"}>Deploy vault · review in MetaMask</button>
+        <p>Pressing this button requests the exact Aave SDK deployment transaction in browser wallet. Nothing is sent unless you review and confirm it in your wallet.</p>
+        <button id="submit-vault-deployment" class="refresh-button" type="button" ${deploymentChecksPassed ? "" : "disabled"}>Deploy vault · review in your browser wallet</button>
         <p id="deployment-submit-status" class="sdk-result" role="status" aria-live="polite">Deployment not submitted.</p>
       </section>
     
@@ -513,7 +513,7 @@ function showPlanDetails(plan: any) {
           if (latestAllowance < deploymentConfig.initialLockDeposit.rawAmount) {
             throw new Error("Factory allowance is now below 1 EURC. Deployment blocked.");
           }
-          deployStatus.textContent = "MetaMask will now show the deployment transaction. Check every detail before confirming.";
+          deployStatus.textContent = "Your browser wallet will now show the deployment transaction. Check every detail before confirming.";
           const txValue = BigInt(String(plan.value ?? 0));
           const txHash = await ethereum.request({
             method: "eth_sendTransaction",
