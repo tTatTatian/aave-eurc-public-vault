@@ -31,10 +31,13 @@ const vaultAbi = [
   "function previewRedeem(uint256) view returns (uint256)",
   "function maxDeposit(address) view returns (uint256)",
   "function maxRedeem(address) view returns (uint256)",
+  "function maxWithdraw(address) view returns (uint256)",
+  "function previewWithdraw(uint256) view returns (uint256)",
   "function getFee() view returns (uint256)",
   "function getClaimableFees() view returns (uint256)",
   "function deposit(uint256,address) returns (uint256)",
   "function redeem(uint256,address,address) returns (uint256)",
+  "function withdraw(uint256,address,address) returns (uint256)",
   "function withdrawFees(address,uint256)"
 ] as const;
 
@@ -81,6 +84,7 @@ panel.innerHTML = `
         <p class="muted">Deposit EURC and receive ylEurc shares at the current vault exchange rate.</p>
         <label for="va-deposit-amount">EURC amount</label>
         <input id="va-deposit-amount" inputmode="decimal" autocomplete="off" placeholder="0.00" />
+        <div class="amount-presets" aria-label="Quick EURC deposit amounts"><button class="preset-button" type="button" data-deposit-preset="1">1 EURC</button><button class="preset-button" type="button" data-deposit-preset="2">2 EURC</button><button class="preset-button" type="button" data-deposit-preset="3">3 EURC</button></div>
         <div class="vault-preview" id="va-deposit-preview">Enter an amount to preview shares.</div>
         <button id="va-deposit" class="refresh-button" type="button">Preview and deposit</button>
         <p id="va-deposit-status" class="action-status" role="status" aria-live="polite">No deposit submitted.</p>
@@ -88,12 +92,12 @@ panel.innerHTML = `
 
       <section class="vault-action-card">
         <p class="eyebrow">REMOVE EURC</p>
-        <h4>Withdraw / redeem</h4>
-        <p class="muted">Redeem ylEurc shares for the underlying EURC. Your wallet must hold the shares.</p>
-        <label for="va-redeem-amount">ylEurc shares</label>
+        <h4>Withdraw EURC</h4>
+        <p class="muted">Enter the EURC amount you want to receive. The dashboard calculates the ylEurc shares required.</p>
+        <label for="va-redeem-amount">EURC amount to withdraw</label>
         <input id="va-redeem-amount" inputmode="decimal" autocomplete="off" placeholder="0.00" />
-        <div class="vault-preview" id="va-redeem-preview">Enter shares to preview EURC returned.</div>
-        <button id="va-redeem" class="refresh-button" type="button">Preview and redeem</button>
+        <div class="vault-preview" id="va-redeem-preview">Enter the EURC amount you want to receive.</div>
+        <button id="va-redeem" class="refresh-button" type="button">Preview and withdraw EURC</button>
         <p id="va-redeem-status" class="action-status" role="status" aria-live="polite">No redemption submitted.</p>
       </section>
 
@@ -258,9 +262,10 @@ async function refreshVault() {
       setText("va-share-value", format(oneShareAssets));
       const maxDeposit = await vault.maxDeposit(connectedAccount) as bigint;
       const maxRedeem = await vault.maxRedeem(connectedAccount) as bigint;
+      const maxWithdraw = await vault.maxWithdraw(connectedAccount) as bigint;
       byId<HTMLButtonElement>("va-deposit").disabled = maxDeposit === 0n;
       byId<HTMLButtonElement>("va-redeem").disabled = maxRedeem === 0n;
-      setStatus("va-status", `Connected · ${connectedAccount.slice(0, 6)}…${connectedAccount.slice(-4)} · Base Mainnet · Max deposit ${format(maxDeposit)} EURC · Max redeem ${format(maxRedeem)} ylEurc`);
+      setStatus("va-status", `Connected · ${connectedAccount.slice(0, 6)}…${connectedAccount.slice(-4)} · Base Mainnet · Max deposit ${format(maxDeposit)} EURC · Max withdraw ${format(maxWithdraw)} EURC`);
     } else {
       setText("va-eurc-balance", "Connect wallet");
       setText("va-share-balance", "Connect wallet");
@@ -321,10 +326,10 @@ byId<HTMLInputElement>("va-deposit-amount").addEventListener("input", async () =
 
 byId<HTMLInputElement>("va-redeem-amount").addEventListener("input", async () => {
   try {
-    const shares = parseAmount(inputValue("va-redeem-amount"), "share");
+    const assets = parseAmount(inputValue("va-redeem-amount"), "EURC withdrawal");
     const { vault } = readContracts();
-    const assets = await vault.previewRedeem(shares) as bigint;
-    setText("va-redeem-preview", `Estimated return: ${format(assets)} EURC`);
+    const shares = await vault.previewWithdraw(assets) as bigint;
+    setText("va-redeem-preview", `You receive ${format(assets)} EURC · estimated shares burned: ${format(shares)} ylEurc`);
   } catch (error) {
     setText("va-redeem-preview", error instanceof Error ? error.message : "Preview unavailable.");
   }
@@ -371,18 +376,19 @@ byId<HTMLButtonElement>("va-redeem").addEventListener("click", async () => {
   try {
     setStatus("va-redeem-status", "Checking wallet, share balance and preview…");
     const { account, signer } = await requireWallet();
-    const shares = parseAmount(inputValue("va-redeem-amount"), "share");
+    const assets = parseAmount(inputValue("va-redeem-amount"), "EURC withdrawal");
     const vault = new Contract(VAULT, vaultAbi, signer);
-    const [balance, maxRedeem, preview] = await Promise.all([
+    const [balance, maxWithdraw, sharesRequired] = await Promise.all([
       vault.balanceOf(account) as Promise<bigint>,
-      vault.maxRedeem(account) as Promise<bigint>,
-      vault.previewRedeem(shares) as Promise<bigint>
+      vault.maxWithdraw(account) as Promise<bigint>,
+      vault.previewWithdraw(assets) as Promise<bigint>
     ]);
-    if (balance < shares || shares > maxRedeem) {
-      throw new Error(`Insufficient redeemable ylEurc. Current balance: ${format(balance)} shares; maxRedeem: ${format(maxRedeem)}.`);
+    if (assets > maxWithdraw) {
+      throw new Error(`Insufficient withdrawable EURC. Maximum currently withdrawable: ${format(maxWithdraw)} EURC. Your share balance is ${format(balance)} ylEurc.`);
     }
-    setStatus("va-redeem-status", `Preview: ${format(shares)} ylEurc → approximately ${format(preview)} EURC. Review the wallet prompt.`);
-    const tx = await vault.redeem(shares, account, account);
+    if (balance < sharesRequired) throw new Error("Your ylEurc balance is insufficient for this EURC withdrawal.");
+    setStatus("va-redeem-status", `Preview: receive ${format(assets)} EURC · burn approximately ${format(sharesRequired)} ylEurc. Review the wallet prompt.`);
+    const tx = await vault.withdraw(assets, account, account);
     setStatus("va-redeem-status", `Redemption submitted: ${tx.hash}. Waiting for confirmation…`);
     await tx.wait();
     setStatus("va-redeem-status", "Redemption confirmed. Your balances are being refreshed.");
