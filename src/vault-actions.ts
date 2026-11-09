@@ -165,10 +165,14 @@ async function refreshVault() {
     setText("va-claimable-fees", format(claimableRaw));
     setText("va-fee-owner", `On-chain owner: ${onchainOwner} · Fee: ${(Number(feeRaw) / 1e16).toFixed(2)}%`);
     const claimButton = byId<HTMLButtonElement>("va-claim-fees");
-    const isOwner = !!connectedAccount &&\n      connectedAccount.toLowerCase() === onchainOwner.toLowerCase() &&\n      onchainOwner.toLowerCase() === OWNER_CONFIG.toLowerCase();
+    const isOwner = !!connectedAccount &&
+      connectedAccount.toLowerCase() === onchainOwner.toLowerCase() &&
+      onchainOwner.toLowerCase() === OWNER_CONFIG.toLowerCase();
     claimButton.disabled = !isOwner || claimableRaw === 0n;
     if (claimableRaw === 0n) {
       setStatus("va-claim-status", "No performance fees are currently claimable.");
+    } else if (onchainOwner.toLowerCase() !== OWNER_CONFIG.toLowerCase()) {
+      setStatus("va-claim-status", "Fee claim blocked: the contract owner differs from the configured owner. This must be reconciled before claiming.");
     } else if (!isOwner) {
       setStatus("va-claim-status", "Fee claim locked: connect the exact on-chain owner wallet. The page will not attempt a claim from another address.");
     } else {
@@ -205,7 +209,22 @@ async function refreshVault() {
   }
 }
 
-byId<HTMLButtonElement>("vault-connect").addEventListener("click", async () => {\n  const button = byId<HTMLButtonElement>("vault-connect");\n  button.disabled = true;\n  try {\n    const { account } = await requireWallet();\n    button.textContent = account.slice(0, 6) + "…" + account.slice(-4);\n    setStatus("va-status", "Wallet connected. Refreshing vault position…");\n    await refreshVault();\n  } catch (error) {\n    setStatus("va-status", error instanceof Error ? error.message : "Wallet connection failed.");\n  } finally {\n    button.disabled = false;\n  }\n});\n\nbyId<HTMLButtonElement>("vault-refresh").addEventListener("click", () => { void refreshVault(); });
+byId<HTMLButtonElement>("vault-connect").addEventListener("click", async () => {
+  const button = byId<HTMLButtonElement>("vault-connect");
+  button.disabled = true;
+  try {
+    const { account } = await requireWallet();
+    button.textContent = account.slice(0, 6) + "…" + account.slice(-4);
+    setStatus("va-status", "Wallet connected. Refreshing vault position…");
+    await refreshVault();
+  } catch (error) {
+    setStatus("va-status", error instanceof Error ? error.message : "Wallet connection failed.");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+byId<HTMLButtonElement>("vault-refresh").addEventListener("click", () => { void refreshVault(); });
 
 byId<HTMLInputElement>("va-deposit-amount").addEventListener("input", async () => {
   try {
