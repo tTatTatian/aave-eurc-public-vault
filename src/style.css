@@ -116,3 +116,28 @@ footer p { margin-bottom: 6px; }
 .disconnect-button:hover { background: #1a293b; }
 .disconnect-button[hidden] { display: none; }
 @media (max-width: 520px) { .wallet-actions { width: 100%; } }
+
+
+/* Live EURC vault interaction panel */
+.vault-actions-section { margin-top: 18px; }
+.vault-actions-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.vault-actions-heading h3 { margin-bottom:7px; }
+.vault-actions-heading .muted { max-width:700px; line-height:1.6; }
+.vault-header-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.vault-position-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:20px 0 4px; }
+.vault-action-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:18px; }
+.vault-action-card { min-width:0; padding:18px; border:1px solid #34465d; border-radius:12px; background:#0d1928; }
+.vault-action-card h4 { margin:0 0 8px; font-size:18px; }
+.vault-action-card .muted { min-height:40px; line-height:1.5; }
+.vault-action-card label { display:block; margin:14px 0 7px; color:#cbd7e5; font-size:12px; font-weight:700; }
+.vault-action-card input { width:100%; min-width:0; padding:12px; border:1px solid #526176; border-radius:9px; color:#edf3fb; background:#101b2d; font:inherit; font-size:16px; }
+.vault-action-card button { width:100%; margin-top:12px; white-space:normal; }
+.vault-action-card button:disabled { opacity:.45; cursor:not-allowed; }
+.vault-preview { min-height:38px; margin-top:10px; color:#a8d9cc; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.action-status { min-height:36px; margin:10px 0 0; color:#9aacc1; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+.fee-amount { display:flex; flex-direction:column; gap:3px; margin:18px 0 10px; }
+.fee-amount strong { font-size:27px; letter-spacing:-.03em; overflow-wrap:anywhere; }
+.fee-amount span { color:#8fa5bd; font-size:11px; }
+.vault-disclaimer { margin:18px 0 0; color:#8295aa; font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
+@media (max-width:850px) { .vault-action-grid { grid-template-columns:1fr 1fr; } .vault-fee-card { grid-column:1 / -1; } }
+@media (max-width:600px) { .vault-position-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .vault-action-grid { grid-template-columns:1fr; } .vault-fee-card { grid-column:auto; } .vault-actions-heading { flex-direction:column; } .vault-header-actions { width:100%; } .vault-header-actions button { flex:1; } }
