@@ -66,7 +66,7 @@ panel.innerHTML = `
         <h3>Manage your EURC position</h3>
         <p class="muted">Deposit EURC, redeem ylEurc shares, or claim manager fees. Every transaction is reviewed and confirmed in your browser wallet.</p>
       </div>
-      <div class="vault-header-actions"><button id="vault-connect" class="refresh-button" type="button">Connect wallet</button><button id="vault-switch-base" class="refresh-button" type="button">Switch to Base</button><button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button></div>
+      <div class="vault-header-actions"><button id="vault-connect" class="refresh-button" type="button">Connect wallet</button><button id="vault-disconnect" class="disconnect-button" type="button" disabled>Disconnect wallet</button><button id="vault-switch-base" class="refresh-button" type="button">Switch to Base</button><button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button></div>
     </div>
 
     <div class="vault-position-grid">
@@ -84,7 +84,6 @@ panel.innerHTML = `
         <p class="muted">Deposit EURC and receive ylEurc shares at the current vault exchange rate.</p>
         <label for="va-deposit-amount">EURC amount</label>
         <input id="va-deposit-amount" inputmode="decimal" autocomplete="off" placeholder="0.00" />
-        <div class="amount-presets" aria-label="Quick EURC deposit amounts"><button class="preset-button" type="button" data-deposit-preset="1">1 EURC</button><button class="preset-button" type="button" data-deposit-preset="2">2 EURC</button><button class="preset-button" type="button" data-deposit-preset="3">3 EURC</button></div>
         <div class="vault-preview" id="va-deposit-preview">Enter an amount to preview shares.</div>
         <button id="va-deposit" class="refresh-button" type="button">Preview and deposit</button>
         <p id="va-deposit-status" class="action-status" role="status" aria-live="polite">No deposit submitted.</p>
@@ -125,17 +124,9 @@ const setText = (id: string, value: string) => { byId<HTMLElement>(id).textConte
 const setStatus = (id: string, value: string) => setText(id, value);
 const inputValue = (id: string) => byId<HTMLInputElement>(id).value.trim();
 
-document.querySelectorAll<HTMLButtonElement>("[data-deposit-preset]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const amount = button.dataset.depositPreset;
-    if (!amount) return;
-    const input = byId<HTMLInputElement>("va-deposit-amount");
-    input.value = amount;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-});
-
 let connectedAccount: string | null = null;
+let locallyDisconnected = false;
+let refreshInProgress = false;
 
 function format(raw: bigint): string {
   return Number(formatUnits(raw, DECIMALS)).toLocaleString(undefined, {
@@ -204,6 +195,7 @@ async function requireWallet(): Promise<{ account: string; signer: Awaited<Retur
   if (verifiedNetwork.chainId !== 8453n) throw new Error("Wallet must be on Base Mainnet (Chain ID 8453) before any transaction.");
   const signer = await browser.getSigner(account);
   connectedAccount = account;
+  locallyDisconnected = false;
   return { account, signer, browser };
 }
 
@@ -216,7 +208,21 @@ function readContracts() {
 }
 
 async function refreshVault() {
+  if (refreshInProgress) return;
+  refreshInProgress = true;
+  const refreshButton = byId<HTMLButtonElement>("vault-refresh");
+  const originalRefreshLabel = refreshButton.textContent || "↻ Refresh";
+  refreshButton.disabled = true;
+  refreshButton.textContent = "Refreshing…";
   try {
+    if (!locallyDisconnected && window.ethereum) {
+      const accounts = await window.ethereum.request({ method: "eth_accounts" }) as string[];
+      connectedAccount = accounts?.[0] ?? null;
+      if (connectedAccount) {
+        const activeChain = await window.ethereum.request({ method: "eth_chainId" }) as string;
+        if (activeChain?.toLowerCase() !== BASE_CHAIN_ID) connectedAccount = null;
+      }
+    }
     const { browser, vault, eurc } = readContracts();
     const [totalAssets, feeRaw, claimableRaw, onchainOwner, assetAddress, aTokenAddress] = await Promise.all([
       vault.totalAssets() as Promise<bigint>,
@@ -271,26 +277,42 @@ async function refreshVault() {
       const oneShareAssets = await vault.convertToAssets(parseUnits("1", DECIMALS)) as bigint;
       setText("va-share-value", format(oneShareAssets));
       const maxDeposit = await vault.maxDeposit(connectedAccount) as bigint;
-      const maxRedeem = await vault.maxRedeem(connectedAccount) as bigint;
       const maxWithdraw = await vault.maxWithdraw(connectedAccount) as bigint;
       byId<HTMLButtonElement>("va-deposit").disabled = maxDeposit === 0n;
-      byId<HTMLButtonElement>("va-redeem").disabled = maxRedeem === 0n;
+      byId<HTMLButtonElement>("va-redeem").disabled = maxWithdraw === 0n;
       setStatus("va-status", `Connected · ${connectedAccount.slice(0, 6)}…${connectedAccount.slice(-4)} · Base Mainnet · Max deposit ${format(maxDeposit)} EURC · Max withdraw ${format(maxWithdraw)} EURC`);
+      byId<HTMLButtonElement>("vault-connect").textContent = `${connectedAccount.slice(0, 6)}…${connectedAccount.slice(-4)}`;
+      byId<HTMLButtonElement>("vault-disconnect").disabled = false;
     } else {
       setText("va-eurc-balance", "Connect wallet");
       setText("va-share-balance", "Connect wallet");
       setText("va-share-value", format(await vault.convertToAssets(parseUnits("1", DECIMALS)) as bigint));
-      setStatus("va-status", "Vault data loaded · connect your browser wallet to see balances and use deposit / redeem.");
+      setStatus("va-status", "Vault data refreshed · connect your browser wallet to see balances and use deposit / withdraw.");
+      byId<HTMLButtonElement>("vault-connect").textContent = "Connect wallet";
+      byId<HTMLButtonElement>("vault-disconnect").disabled = true;
       byId<HTMLButtonElement>("va-deposit").disabled = false;
       byId<HTMLButtonElement>("va-redeem").disabled = false;
     }
   } catch (error) {
-    setStatus("va-status", error instanceof Error ? error.message : "Unable to read the vault.");
+    setStatus("va-status", `Refresh failed: ${error instanceof Error ? error.message : "Unable to read the vault."}`);
     byId<HTMLButtonElement>("va-deposit").disabled = true;
     byId<HTMLButtonElement>("va-redeem").disabled = true;
     byId<HTMLButtonElement>("va-claim-fees").disabled = true;
+  } finally {
+    refreshButton.disabled = false;
+    refreshButton.textContent = originalRefreshLabel;
+    refreshInProgress = false;
   }
 }
+
+byId<HTMLButtonElement>("vault-disconnect").addEventListener("click", async () => {
+  locallyDisconnected = true;
+  connectedAccount = null;
+  byId<HTMLButtonElement>("vault-connect").textContent = "Connect wallet";
+  byId<HTMLButtonElement>("vault-disconnect").disabled = true;
+  setStatus("va-status", "Disconnected from this dashboard. Wallet permissions in MetaMask are unchanged.");
+  await refreshVault();
+});
 
 byId<HTMLButtonElement>("vault-switch-base").addEventListener("click", async () => {
   const button = byId<HTMLButtonElement>("vault-switch-base");
@@ -312,6 +334,7 @@ byId<HTMLButtonElement>("vault-connect").addEventListener("click", async () => {
   try {
     const { account } = await requireWallet();
     button.textContent = account.slice(0, 6) + "…" + account.slice(-4);
+    byId<HTMLButtonElement>("vault-disconnect").disabled = false;
     setStatus("va-status", "Wallet connected on Base Mainnet. Refreshing vault position…");
     await refreshVault();
   } catch (error) {
