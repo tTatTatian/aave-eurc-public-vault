@@ -151,7 +151,9 @@ function readContracts() {
 
 async function refreshVault() {
   try {
-    const { vault, eurc } = readContracts();
+    const { browser, vault, eurc } = readContracts();
+    const network = await browser.getNetwork();
+    if (network.chainId !== 8453n) throw new Error("Switch your browser wallet to Base Mainnet (Chain ID 8453) to read this vault.");
     const [totalAssets, feeRaw, claimableRaw, onchainOwner, assetAddress, aTokenAddress] = await Promise.all([
       vault.totalAssets() as Promise<bigint>,
       vault.getFee() as Promise<bigint>,
