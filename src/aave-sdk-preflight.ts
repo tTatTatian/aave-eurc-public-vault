@@ -228,10 +228,9 @@ function decodeVaultDeployment(data: string) {
 function showDecodedDeployment(data: string): string {
   const decoded = decodeVaultDeployment(data);
   const expectedFee = BigInt(deploymentConfig.performanceFeeBps) * 10n ** 18n / 10_000n;
-  // The Aave API encodes the owner and Aave Labs' verified fee-recipient Safe
-  // directly in this deployment calldata, at 50% each. Treat these as the
-  // complete intended split for this deployment; do not add another automatic
-  // 50% on top of this encoded two-recipient allocation.
+  // The SDK request omits the optional recipients field. Aave's documented
+  // default is 50% of total fee revenue to the owner and 50% to Aave Labs.
+  // The API encodes those two default recipients in the deployment calldata.
   const aaveLabsRecipient = "0xba3fa06e181d4a64b07d0ed0e8369811f0ad44ba";
   const expectedRecipients = [
     { address: deploymentConfig.owner.toLowerCase(), shareInBps: 5_000 },
@@ -263,7 +262,7 @@ function showDecodedDeployment(data: string): string {
   ).join("");
   const recipientRows = decoded.recipients.map((recipient) =>
     '<li><code>' + escapeHtml(recipient.address) + '</code> — ' +
-    escapeHtml((recipient.shareInBps / 100).toFixed(2)) + '% of manager-side allocation</li>'
+    escapeHtml((recipient.shareInBps / 100).toFixed(2)) + '% of total performance-fee revenue</li>'
   ).join("");
   return '<section class="sdk-detail-card"><h4>Decoded vault deployment configuration</h4>' +
     '<p class="sdk-decode-status ' + (allPass ? "pass" : "fail") + '">' +
@@ -280,7 +279,7 @@ function showDecodedDeployment(data: string): string {
     '<div><dt>Share token symbol</dt><dd>' + escapeHtml(decoded.shareSymbol) + '</dd></div></dl>' +
     '<h4 class="sdk-recipient-heading">Fee recipients encoded by Aave API</h4>' +
     '<ul class="sdk-recipient-list">' + (recipientRows || "<li>No recipients encoded</li>") + '</ul>' +
-    '<p class="sdk-review-warning">The Aave API encodes the configured owner wallet and the Aave Labs fee-recipient Safe as the two recipients, 50% each of the displayed manager-side allocation. The second address is treated as Aave Labs fee recipient, not as an additional partner. Both addresses and their exact 50/50 split are checked against the reviewed deployment configuration.</p></section>';
+    '<p class="sdk-review-warning">Because the SDK request omits custom recipients, Aave applies its documented default split. The API encodes the owner wallet and the Aave Labs fee-recipient Safe as the two default recipients, 50% each of total performance-fee revenue. The second address is treated as Aave Labs fee recipient, not as an additional partner. Both addresses and their exact 50/50 split are checked against the reviewed deployment configuration.</p></section>';
 }
 
 function showPlanDetails(plan: any) {
