@@ -135,7 +135,7 @@ function format(raw: bigint): string {
   });
 }
 function parseAmount(value: string, label: string): bigint {
-  if (!value || !/^\\d+(\\.\\d{0,6})?$/.test(value)) {
+  if (!value || !/^\d+(\.\d{0,6})?$/.test(value)) {
     throw new Error(`Enter a valid ${label} amount with up to 6 decimal places.`);
   }
   const amount = parseUnits(value, DECIMALS);
