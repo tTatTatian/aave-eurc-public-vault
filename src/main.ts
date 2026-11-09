@@ -18,22 +18,22 @@ app.innerHTML = `
         <p class="eyebrow">BASE MAINNET · CHAIN 8453</p>
         <h1>${vaultConfig.name}</h1>
       </div>
-      <span class="status-pill">Development preview</span>
+      <span class="status-pill">Live vault interface</span>
     </header>
 
     <section class="hero">
       <p class="eyebrow">EURC YIELD STRATEGY</p>
       <h2>One asset. One protocol.<br />Transparent by design.</h2>
-      <p class="intro">A proposed public, non-custodial vault designed to supply EURC to Aave V3 on Base.</p>
+      <p class="intro">A public EURC vault supplying liquidity to Aave V3 on Base. Deposit, redeem shares and manage owner fees from one dashboard.</p>
       <div class="notice">
-        <strong>Not deployed — no deposits accepted.</strong>
-        <span>Read-only development preview. Browser wallet connection is available for address and network detection only; token approvals, signing and vault deployment remain disabled.</span>
+        <strong>Deployed on Base Mainnet.</strong>
+        <span>Vault contract: 0x56E70807df5e23eB628327c788De38C8f8dF95Bc. Deposits and redemptions require explicit browser-wallet confirmation. Fee claims are restricted to the on-chain vault owner.</span>
       </div>
       <div class="wallet-connect panel" aria-label="Browser wallet connection">
         <div>
           <p class="eyebrow">BROWSER WALLET</p>
           <strong id="wallet-status">Not connected</strong>
-          <p id="wallet-detail" class="muted">Connect MetaMask or another injected browser wallet. Read-only connection only.</p>
+          <p id="wallet-detail" class="muted">Connect your browser wallet to view your position and interact with the vault.</p>
         </div>
         <div class="wallet-actions">
           <button id="connect-wallet" class="refresh-button" type="button">Connect browser wallet</button>
@@ -41,6 +41,8 @@ app.innerHTML = `
         </div>
       </div>
     </section>
+
+    <section class="panel" id="vault-actions" aria-label="Vault deposits, withdrawals and fee claims"></section>
 
     <section class="grid" aria-label="Vault configuration">
       <article class="panel">
@@ -140,7 +142,7 @@ app.innerHTML = `
 
     <footer>
       <p>EURC supply rates vary and are not guaranteed. Smart-contract, protocol and liquidity risks apply.</p>
-      <p>Wallet connection is read-only. Token approvals, transaction signing and vault deployment are disabled in this preview.</p>
+      <p>Vault actions require separate wallet confirmations. Never approve or sign unless the token, amount, recipient and network match the action you intend.</p>
     </footer>
   </main>
 `;
@@ -288,6 +290,7 @@ window.setInterval(() => {
 
 // Mount the official Aave SDK preflight only after the dashboard DOM exists.
 void import("./aave-sdk-preflight");
+void import("./vault-actions");
 
 
 type InjectedWallet = {
@@ -321,7 +324,7 @@ connectButton.addEventListener("click", async () => {
   const wallet = (window as Window & { ethereum?: InjectedWallet }).ethereum;
   if (!wallet) {
     walletStatus.textContent = "No browser wallet detected";
-    walletDetail.textContent = "Open this dashboard in MetaMask's browser or a browser with an injected EVM wallet.";
+    walletDetail.textContent = "Open this dashboard in a browser with your EVM wallet enabled.";
     return;
   }
 
