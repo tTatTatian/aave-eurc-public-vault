@@ -143,22 +143,11 @@ footer p { margin-bottom: 6px; }
 @media (max-width:600px) { .vault-position-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .vault-action-grid { grid-template-columns:1fr; } .vault-fee-card { grid-column:auto; } .vault-actions-heading { flex-direction:column; } .vault-header-actions { width:100%; } .vault-header-actions button { flex:1; } }
 
 
-.amount-presets {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.65rem 0;
+.vault-header-actions .disconnect-button {
+  min-height: 40px;
+  padding: 10px 12px;
 }
-.preset-button {
-  flex: 1;
-  min-height: 2.5rem;
-  border: 1px solid var(--border, #334155);
-  border-radius: 0.65rem;
-  background: var(--panel, #172033);
-  color: inherit;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.preset-button:active {
-  transform: translateY(1px);
+.vault-header-actions .disconnect-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
 }
