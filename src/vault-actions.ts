@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, formatUnits, parseUnits } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatUnits, parseUnits } from "ethers";
 import { vaultConfig } from "./config";
 
 type InjectedProvider = {
@@ -63,7 +63,7 @@ panel.innerHTML = `
         <h3>Manage your EURC position</h3>
         <p class="muted">Deposit EURC, redeem ylEurc shares, or claim manager fees. Every transaction is reviewed and confirmed in your browser wallet.</p>
       </div>
-      <div class="vault-header-actions"><button id="vault-connect" class="refresh-button" type="button">Connect wallet</button><button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button></div>
+      <div class="vault-header-actions"><button id="vault-connect" class="refresh-button" type="button">Connect wallet</button><button id="vault-switch-base" class="refresh-button" type="button">Switch to Base</button><button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button></div>
     </div>
 
     <div class="vault-position-grid">
@@ -137,35 +137,73 @@ function parseAmount(value: string, label: string): bigint {
   if (amount <= 0n) throw new Error(`The ${label} amount must be greater than zero.`);
   return amount;
 }
+const BASE_CHAIN_ID = "0x2105";
+const publicProvider = new JsonRpcProvider("https://mainnet.base.org");
+
 function walletProvider(): BrowserProvider {
-  if (!window.ethereum) throw new Error("No browser wallet was detected. Open this page in your wallet-enabled browser.");
+  if (!window.ethereum) throw new Error("No browser wallet was detected. Open this page in a wallet-enabled browser.");
   return new BrowserProvider(window.ethereum as never);
 }
+
+async function switchWalletToBase(): Promise<void> {
+  if (!window.ethereum) throw new Error("No browser wallet was detected. Open this page in a wallet-enabled browser.");
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_CHAIN_ID }]
+    });
+  } catch (switchError) {
+    const errorCode = (switchError as { code?: number })?.code;
+    if (errorCode !== 4902) throw switchError;
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [{
+        chainId: BASE_CHAIN_ID,
+        chainName: "Base Mainnet",
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        rpcUrls: ["https://mainnet.base.org"],
+        blockExplorerUrls: ["https://basescan.org"]
+      }]
+    });
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_CHAIN_ID }]
+    });
+  }
+  const activeChain = await window.ethereum.request({ method: "eth_chainId" }) as string;
+  if (activeChain?.toLowerCase() !== BASE_CHAIN_ID) {
+    throw new Error(`Wallet did not switch to Base Mainnet. Active chain: ${activeChain ?? "unknown"}.`);
+  }
+}
+
 async function requireWallet(): Promise<{ account: string; signer: Awaited<ReturnType<BrowserProvider["getSigner"]>>; browser: BrowserProvider }> {
   const browser = walletProvider();
   const accounts = await window.ethereum!.request({ method: "eth_requestAccounts" }) as string[];
   const account = accounts?.[0];
   if (!account) throw new Error("The browser wallet did not return an account.");
   const network = await browser.getNetwork();
-  if (network.chainId !== 8453n) throw new Error("Switch your browser wallet to Base Mainnet (Chain ID 8453).");
+  if (network.chainId !== 8453n) {
+    setStatus("va-status", "Requesting switch to Base Mainnet (8453) in your wallet…");
+    await switchWalletToBase();
+  }
+  const verifiedNetwork = await browser.getNetwork();
+  if (verifiedNetwork.chainId !== 8453n) throw new Error("Wallet must be on Base Mainnet (Chain ID 8453) before any transaction.");
   const signer = await browser.getSigner(account);
   connectedAccount = account;
   return { account, signer, browser };
 }
+
 function readContracts() {
-  const browser = walletProvider();
   return {
-    browser,
-    vault: new Contract(VAULT, vaultAbi, browser),
-    eurc: new Contract(EURC, erc20Abi, browser)
+    browser: publicProvider,
+    vault: new Contract(VAULT, vaultAbi, publicProvider),
+    eurc: new Contract(EURC, erc20Abi, publicProvider)
   };
 }
 
 async function refreshVault() {
   try {
     const { browser, vault, eurc } = readContracts();
-    const network = await browser.getNetwork();
-    if (network.chainId !== 8453n) throw new Error("Switch your browser wallet to Base Mainnet (Chain ID 8453) to read this vault.");
     const [totalAssets, feeRaw, claimableRaw, onchainOwner, assetAddress, aTokenAddress] = await Promise.all([
       vault.totalAssets() as Promise<bigint>,
       vault.getFee() as Promise<bigint>,
@@ -239,13 +277,27 @@ async function refreshVault() {
   }
 }
 
+byId<HTMLButtonElement>("vault-switch-base").addEventListener("click", async () => {
+  const button = byId<HTMLButtonElement>("vault-switch-base");
+  button.disabled = true;
+  try {
+    await switchWalletToBase();
+    setStatus("va-status", "Wallet is now on Base Mainnet (8453). Refreshing vault data…");
+    await refreshVault();
+  } catch (error) {
+    setStatus("va-status", error instanceof Error ? error.message : "Unable to switch wallet to Base Mainnet.");
+  } finally {
+    button.disabled = false;
+  }
+});
+
 byId<HTMLButtonElement>("vault-connect").addEventListener("click", async () => {
   const button = byId<HTMLButtonElement>("vault-connect");
   button.disabled = true;
   try {
     const { account } = await requireWallet();
     button.textContent = account.slice(0, 6) + "…" + account.slice(-4);
-    setStatus("va-status", "Wallet connected. Refreshing vault position…");
+    setStatus("va-status", "Wallet connected on Base Mainnet. Refreshing vault position…");
     await refreshVault();
   } catch (error) {
     setStatus("va-status", error instanceof Error ? error.message : "Wallet connection failed.");
