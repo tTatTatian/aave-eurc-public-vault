@@ -157,10 +157,14 @@ async function refreshVault() {
       vault.getFee() as Promise<bigint>,
       vault.getClaimableFees() as Promise<bigint>,
       vault.owner() as Promise<string>,
-      vault.asset() as Promise<string>
+      vault.asset() as Promise<string>,
+      vault.ATOKEN() as Promise<string>
     ]);
     if (assetAddress.toLowerCase() !== EURC.toLowerCase()) {
       throw new Error("The deployed vault asset does not match the configured EURC contract. Actions are blocked.");
+    }
+    if (aTokenAddress.toLowerCase() !== vaultConfig.aaveV3.aToken.toLowerCase()) {
+      throw new Error("The deployed vault aToken does not match the configured Base EURC aToken. Actions are blocked.");
     }
     setText("va-total-assets", format(totalAssets));
     setText("va-claimable-fees", format(claimableRaw));
