@@ -13,7 +13,6 @@ declare global {
 
 const VAULT = "0x56E70807df5e23eB628327c788De38C8f8dF95Bc";
 const EURC = vaultConfig.asset.address;
-const ATOKEN = vaultConfig.aaveV3.aToken;
 const OWNER_CONFIG = vaultConfig.owner;
 const DECIMALS = vaultConfig.asset.decimals;
 
@@ -52,7 +51,7 @@ panel.innerHTML = `
         <h3>Manage your EURC position</h3>
         <p class="muted">Deposit EURC, redeem ylEurc shares, or claim manager fees. Every transaction is reviewed and confirmed in your browser wallet.</p>
       </div>
-      <button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button>
+      <div class="vault-header-actions"><button id="vault-connect" class="refresh-button" type="button">Connect wallet</button><button id="vault-refresh" class="refresh-button" type="button">↻ Refresh</button></div>
     </div>
 
     <div class="vault-position-grid">
@@ -110,8 +109,6 @@ const setStatus = (id: string, value: string) => setText(id, value);
 const inputValue = (id: string) => byId<HTMLInputElement>(id).value.trim();
 
 let connectedAccount: string | null = null;
-let provider: BrowserProvider | null = null;
-let busy = false;
 
 function format(raw: bigint): string {
   return Number(formatUnits(raw, DECIMALS)).toLocaleString(undefined, {
@@ -140,7 +137,6 @@ async function requireWallet(): Promise<{ account: string; signer: Awaited<Retur
   if (network.chainId !== 8453n) throw new Error("Switch your browser wallet to Base Mainnet (Chain ID 8453).");
   const signer = await browser.getSigner(account);
   connectedAccount = account;
-  provider = browser;
   return { account, signer, browser };
 }
 function readContracts() {
@@ -202,7 +198,6 @@ async function refreshVault() {
       byId<HTMLButtonElement>("va-deposit").disabled = false;
       byId<HTMLButtonElement>("va-redeem").disabled = false;
     }
-    provider = browser;
   } catch (error) {
     setStatus("va-status", error instanceof Error ? error.message : "Unable to read the vault.");
     byId<HTMLButtonElement>("va-deposit").disabled = true;
@@ -211,7 +206,7 @@ async function refreshVault() {
   }
 }
 
-byId<HTMLButtonElement>("vault-refresh").addEventListener("click", () => { void refreshVault(); });
+byId<HTMLButtonElement>("vault-connect").addEventListener("click", async () => {\n  const button = byId<HTMLButtonElement>("vault-connect");\n  button.disabled = true;\n  try {\n    const { account } = await requireWallet();\n    button.textContent = account.slice(0, 6) + "…" + account.slice(-4);\n    setStatus("va-status", "Wallet connected. Refreshing vault position…");\n    await refreshVault();\n  } catch (error) {\n    setStatus("va-status", error instanceof Error ? error.message : "Wallet connection failed.");\n  } finally {\n    button.disabled = false;\n  }\n});\n\nbyId<HTMLButtonElement>("vault-refresh").addEventListener("click", () => { void refreshVault(); });
 
 byId<HTMLInputElement>("va-deposit-amount").addEventListener("input", async () => {
   try {
