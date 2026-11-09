@@ -25,7 +25,7 @@ panel.innerHTML = `
     </div>
     <div class="sdk-config-grid">
       <div><span>SDK</span><strong>@aave/client 0.12.0</strong></div>
-      <div><span>Initial lock</span><strong>1 EURC · API validation pending</strong></div>
+      <div><span>Initial lock</span><strong id="initial-lock-status">1 EURC · allowance check pending</strong></div>
       <div><span>Owner / deployer</span><code>${deploymentConfig.deployer}</code></div>
       <div><span>Fee</span><strong>10% · 100% manager-side recipient allocation</strong></div>
     </div>
@@ -126,6 +126,33 @@ function approvalSafetyChecks(approval: any, deployment: any): [string, boolean]
 
 const BASE_POOL_ADDRESSES_PROVIDER = "0xe20fcBdbfFC4Dd138cE8b2E6FBb6CB49777ad64D".toLowerCase();
 const DEPLOY_VAULT_SELECTOR = "0x81d42dea";
+
+const BASE_RPC_URL = "https://mainnet.base.org";
+const EURC_ALLOWANCE_SELECTOR = "0xdd62ed3e";
+
+async function readEurcFactoryAllowance(owner: string): Promise<bigint> {
+  const addressWord = (address: string) => address.slice(2).toLowerCase().padStart(64, "0");
+  const data = EURC_ALLOWANCE_SELECTOR +
+    addressWord(owner) +
+    addressWord("0xa35995bb2ffc5f2b33379c2e95d00c20fbf71e70");
+  const response = await fetch(BASE_RPC_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ to: deploymentConfig.asset.address, data }, "latest"]
+    })
+  });
+  if (!response.ok) throw new Error(`Base RPC returned HTTP ${response.status} while checking EURC allowance.`);
+  const payload = await response.json() as { result?: string; error?: { message?: string } };
+  if (payload.error) throw new Error(payload.error.message || "Base RPC allowance call failed.");
+  if (!payload.result || !/^0x[0-9a-fA-F]{64}$/.test(payload.result)) {
+    throw new Error("Base RPC returned an invalid EURC allowance value.");
+  }
+  return BigInt(payload.result);
+}
 
 function readAbiWord(body: string, byteOffset: number): bigint {
   const start = byteOffset * 2;
@@ -524,7 +551,18 @@ async function runPreflight() {
     }
 
     const plan = deployResult.value;
-    resultElement.textContent = "Aave SDK returned a deployment plan · nothing was sent";
+    const allowance = await readEurcFactoryAllowance(deploymentConfig.deployer);
+    const requiredAllowance = deploymentConfig.initialLockDeposit.rawAmount;
+    const allowanceStatus = document.getElementById("initial-lock-status");
+    if (allowanceStatus) {
+      allowanceStatus.textContent = allowance >= requiredAllowance
+        ? "1 EURC · factory allowance verified on Base"
+        : `1 EURC · allowance insufficient (${formatUnits(allowance, deploymentConfig.asset.decimals)} EURC)`;
+    }
+    if (allowance < requiredAllowance) {
+      throw new Error(`EURC allowance is below the required 1 EURC. Current factory allowance: ${formatUnits(allowance, deploymentConfig.asset.decimals)} EURC. No deployment transaction was sent.`);
+    }
+    resultElement.textContent = "Base EURC allowance verified · deployment plan ready · nothing was sent";
     showPlanDetails(plan);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Aave SDK preflight error.";
