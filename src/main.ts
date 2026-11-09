@@ -119,25 +119,20 @@ app.innerHTML = `
       <p id="live-error" class="live-error" hidden></p>
     </section>
 
-    <section class="panel sdk-panel" id="aave-sdk-preflight"></section>
-
     <section class="panel details">
       <div>
-        <p class="eyebrow">DEVELOPMENT CHECKLIST</p>
-        <h3>Deployment safety</h3>
+        <p class="eyebrow">VAULT OPERATIONS</p>
+        <h3>Live contract checks</h3>
       </div>
       <ul>
-        <li class="done">Base and EURC configuration recorded</li>
-        <li class="done">Aave V3 Pool and aToken addresses recorded</li>
-        <li class="done">Live Aave reserve data connected (read-only)</li>
-        <li class="done">Vault name, share symbol, owner, fee rate and initial lock recorded</li>
-        <li class="done">Official Aave SDK reserve verification and deployment-plan preflight integrated</li>
-        <li class="done">Fee recipient calldata validation integrated</li>
-        <li class="done">Configuration safety tests added — run in Codespaces</li>
-        <li class="done">Browser wallet connection enabled for address and network detection only</li>
-        <li>Deployment review and explicit approval — pending</li>
-      </ul>
-      <p class="footnote">Build status: ${developmentStatus.phase}. Browser wallet connection is read-only; transaction signing, submission and vault deployment remain disabled.</p>
+        <li class="done">Vault deployed on Base Mainnet</li>
+        <li class="done">EURC asset and Aave V3 market verified</li>
+        <li class="done">10% performance fee verified on-chain</li>
+        <li class="done">Initial 1 ylEurc share confirmed at the vault address</li>
+        <li class="done">Deposit and redeem interface added</li>
+        <li class="done">Manager fee claim interface added with on-chain owner checks</li>
+        <li>Owner address discrepancy must be resolved before fee claims can be enabled</li>
+      </ul>      <p class="footnote">Deposits and redemptions require explicit wallet approval. Manager fee claims are blocked unless the connected wallet matches the on-chain owner and the configured owner.</p>
     </section>
 
     <footer>
@@ -289,7 +284,6 @@ window.setInterval(() => {
 
 
 // Mount the official Aave SDK preflight only after the dashboard DOM exists.
-void import("./aave-sdk-preflight");
 void import("./vault-actions");
 
 
@@ -305,7 +299,7 @@ const walletDetail = getElement("wallet-detail");
 function showWalletState(address: string | null, chainId: string | null) {
   if (!address) {
     walletStatus.textContent = "Not connected";
-    walletDetail.textContent = "Connect MetaMask or another injected browser wallet. Read-only connection only.";
+    walletDetail.textContent = "Connect your browser wallet to view your position and interact with the vault.";
     connectButton.textContent = "Connect browser wallet";
     disconnectButton.hidden = true;
     return;
