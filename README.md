@@ -1,6 +1,6 @@
 # Aave EURC Public Vault
 
-A proposed public, non-custodial EURC yield vault on Base Mainnet, using Aave V3 as its only intended yield strategy.
+A deployed public, non-custodial EURC yield vault on Base Mainnet, using Aave V3 as its yield strategy.
 
 ## Confirmed project configuration
 
@@ -55,20 +55,22 @@ Official references:
 - No borrowing, leverage, looping, swaps, or additional strategies.
 - Public deposits are intended, subject to the official vault implementation's actual deposit controls.
 - No private keys or seed phrases are collected, stored, or handled.
-- Wallet interaction is intended to be through MetaMask.
+- Wallet interaction uses the injected browser wallet provider available in the user's browser.
 - No approval, deposit, withdrawal, deployment, or other transaction may be signed or submitted without explicit user approval.
-- The confirmed deployer address is recorded in configuration, but the current application remains read-only. It does not connect a wallet or execute transactions. Recording the deployer is not permission to connect, sign, or broadcast.
+- The application never stores private keys or seed phrases. Deposits, redemptions and fee claims are requested only from the user's browser wallet after a direct user action.
 - Deployment must use the official Aave Simple Earn SDK/API; a hand-written clone is not the intended route.
 
-## Development status
+## Application status
 
-Status: configuration and read-only dashboard in development. **Not deployed.**
+The vault is deployed at `0x56E70807df5e23eB628327c788De38C8f8dF95Bc` on Base Mainnet. The dashboard now includes EURC deposit, ylEurc redeem, and manager fee-claim panels. Wallet transactions are initiated only after the user presses an action button and confirms each request in the browser wallet.
 
 Implemented:
-1. Base/EURC/Aave V3 configuration.
-2. Read-only live Aave EURC reserve dashboard.
-3. Confirmed vault identity, owner, fee rate, recipient split and initial lock recorded in `src/deployment-config.ts`.
-4. Configuration safety tests added in `tests/deployment-config.test.ts`.
+1. Base/EURC/Aave V3 configuration and live reserve dashboard.
+2. Deployed vault address and on-chain asset / aToken identity checks.
+3. EURC deposit with preview, exact allowance approval and deposit.
+4. ylEurc share redemption with preview.
+5. Manager fee claim panel using `withdrawFees(to, amount)` and a strict on-chain owner match.
+6. Configuration safety tests in `tests/deployment-config.test.ts`.
 
 Implemented in this stage:
 - Official `@aave/react` `useVaultDeploy` preflight is mounted in the dashboard.
@@ -76,13 +78,11 @@ Implemented in this stage:
 - No wallet connector, transaction sender, signing hook, or private-key code is included.
 
 Still required:
-1. Install and lock the official SDK dependencies in StackBlitz, then run the build and tests.
-2. Verify the connected MetaMask address matches the confirmed deployer and owner, then independently review the SDK-generated deployment plan.
-3. Implement deployment preview and transaction review, with explicit approval required before wallet submission. The current preflight deliberately stops before wallet connection or transaction submission.
-4. Add integration tests for the official SDK deployment plan and edge cases.
-5. Add contract-level tests for deposits, withdrawals, yield accounting, fee collection, fee recipient allocation, and permanently locked initial shares.
-6. Run unit tests, production build and independent contract/security review.
-7. Review the final deployment transaction and obtain explicit approval before any wallet action.
+1. Run `npm run build` and `npm test` in StackBlitz.
+2. Confirm the on-chain `owner()` value matches the configured owner wallet; the fee-claim button deliberately remains blocked if they differ.
+3. Test deposit and redeem flows on a fork or with a small, explicitly approved amount before inviting public depositors.
+4. Independently review fee-recipient allocation and proxy upgrade authority.
+5. Add contract-level integration tests for deposits, withdrawals, fee collection, fee recipients and locked initial shares.
 
 ## Local development
 
@@ -113,4 +113,4 @@ Aave supply rates are variable and not guaranteed. The vault would introduce sma
 
 ---
 
-No deployment, wallet approval, or transaction is authorized by this repository documentation.
+This repository does not authorize any transaction by itself. Each transaction must be independently reviewed and confirmed in the user's browser wallet.
