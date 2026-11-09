@@ -1,4 +1,4 @@
-import { vaultConfig, developmentStatus } from "./config";
+import { vaultConfig } from "./config";
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app");
@@ -283,7 +283,7 @@ window.setInterval(() => {
 }, 60_000);
 
 
-// Mount the official Aave SDK preflight only after the dashboard DOM exists.
+// Mount the vault operations module after the dashboard DOM exists.
 void import("./vault-actions");
 
 
