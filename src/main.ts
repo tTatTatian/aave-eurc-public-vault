@@ -27,7 +27,7 @@ app.innerHTML = `
       <p class="intro">A public EURC vault supplying liquidity to Aave V3 on Base. Deposit, redeem shares and manage owner fees from one dashboard.</p>
       <div class="notice">
         <strong>Deployed on Base Mainnet.</strong>
-        <span>Vault contract: 0x56E70807df5e23eB628327c788De38C8f8dF95Bc. Deposits and redemptions require explicit browser-wallet confirmation. Fee claims are restricted to the on-chain vault owner.</span>
+        <span>Vault contract: 0x56E70807df5e23eB628327c788De38C8f8dF95Bc. Deposits and redemptions require explicit browser-wallet confirmation. Fee claims use the deployed revenue splitter: the connected wallet must own the splitter, which owns the vault.</span>
       </div>
       <div class="wallet-connect panel" aria-label="Browser wallet connection">
         <div>
@@ -131,8 +131,9 @@ app.innerHTML = `
         <li class="done">Initial 1 ylEurc share confirmed at the vault address</li>
         <li class="done">Deposit and redeem interface added</li>
         <li class="done">Manager fee claim interface added with on-chain owner checks</li>
-        <li>Owner address discrepancy must be resolved before fee claims can be enabled</li>
-      </ul>      <p class="footnote">Deposits and redemptions require explicit wallet approval. Manager fee claims are blocked unless the connected wallet matches the on-chain owner and the configured owner.</p>
+        <li class="done">Revenue splitter ownership and 50/50 recipients verified on Base</li>
+        <li class="done">Fee collection and distribution workflow integrated in dashboard</li>
+      </ul>      <p class="footnote">Deposits and redemptions require explicit wallet approval. Fee collection and distribution require two separate wallet confirmations and on-chain verification of splitter ownership and recipients.</p>
     </section>
 
     <footer>
